@@ -1,0 +1,23 @@
+# Scan output directories
+pentest_*/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Report regeneration helper (local use only)
+regen.py
+
+# Tool update timestamp
+.last_update
+
+# Password wordlists (may contain sensitive data)
+*.txt
+!yao_ffuf_wordlist.txt
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
