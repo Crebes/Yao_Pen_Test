@@ -271,6 +271,14 @@ def reconstruct_status(batch_dir):
     done_count = sum(1 for t in target_states if t["status"] in ("complete","offline","unreachable"))
     current = next((t for t in target_states if t["status"]=="running"), None)
 
+    # Check if any pentest_wizard process is actually running right now
+    import subprocess as _sp
+    try:
+        _pgrep = _sp.run(["pgrep", "-f", "pentest_wizard"], capture_output=True, text=True)
+        wizards_running = bool(_pgrep.stdout.strip())
+    except Exception:
+        wizards_running = any(t["status"] == "running" for t in target_states)
+
     return {
         "batch_dir": batch_dir,
         "complete": complete,
@@ -279,6 +287,7 @@ def reconstruct_status(batch_dir):
         "current_url": current["url"] if current else "",
         "current_module": current_module,
         "targets": target_states,
+        "wizards_running": wizards_running,
     }
 
 def get_log_tail(lines=80):
@@ -1173,7 +1182,9 @@ async function refresh() {
 
     // Banners
     const hasTargets = (status.targets || []).length > 0;
-    const isRunning  = (status.targets || []).some(t => t.status === "running");
+    // Use wizards_running (actual pgrep check) not just target status,
+    // since targets show "queued" during the early nmap phase before dirs exist
+    const isRunning  = status.wizards_running || (status.targets || []).some(t => t.status === "running");
     document.getElementById("complete-banner").style.display  = (status.complete && hasTargets) ? "block" : "none";
     document.getElementById("no-scan-banner").style.display   = (!hasTargets || (!isRunning && !status.complete)) ? "block" : "none";
     if (isRunning || status.complete) document.getElementById("no-scan-banner").style.display = "none";
