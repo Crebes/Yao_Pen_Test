@@ -485,8 +485,8 @@ HTML = r"""<!DOCTYPE html>
         <td style="padding:8px 12px;color:#8fb3c8;">All scans are unauthenticated. Vulnerabilities behind login are not tested.</td>
       </tr>
       <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
-        <td style="padding:8px 12px;color:#e67e22;font-weight:700;">CORS misconfiguration</td>
-        <td style="padding:8px 12px;color:#8fb3c8;">Cross-origin request policy not actively tested (corsy not yet integrated).</td>
+        <td style="padding:8px 12px;color:#27ae60;font-weight:700;">CORS misconfiguration</td>
+        <td style="padding:8px 12px;color:#8fb3c8;">Tested by <strong>Corsy</strong> (Module 11) — checks wildcard, origin reflection, null origin, subdomain bypass.</td>
       </tr>
       <tr style="border-top:1px solid #1e3a5f;">
         <td style="padding:8px 12px;color:#e67e22;font-weight:700;">Subdomain takeover</td>
@@ -902,6 +902,7 @@ def generate_export_report():
         ("8","wafw00f","WAF/CDN detection","wafw00f <url> -a -o wafw00f.txt","ALL"),
         ("9","checkdmarc","Email security (SPF/DKIM/DMARC)","checkdmarc <base-domain> --format json -o checkdmarc.json","ALL"),
         ("10","SecretFinder","JavaScript bundle secret scanner","python3 SecretFinder.py -i <url> -o cli","ALL"),
+        ("11","corsy","CORS misconfiguration scanner","corsy -u <url> -o corsy.json --headers \"User-Agent: PentestWizard/1.0\"","ALL"),
     ]
     for num, tool, purpose, cmd, modes in modules:
         mc2 = "#1a7a4a" if modes=="ALL" else "#b45309"
@@ -1122,7 +1123,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/tools":
             import shutil
             tools = ["nmap","nikto","hydra","ffuf","testssl.sh","jwt_tool",
-                     "nuclei","wafw00f","checkdmarc","secretfinder"]
+                     "nuclei","wafw00f","checkdmarc","secretfinder","corsy"]
             result = {t: shutil.which(t) or "" for t in tools}
             self.send_json(result)
 

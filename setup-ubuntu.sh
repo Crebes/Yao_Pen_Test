@@ -119,6 +119,17 @@ SFEOF
 chmod +x /usr/local/bin/secretfinder
 ok "secretfinder → $(which secretfinder)"
 
+# ── Corsy ──────────────────────────────────────────────────
+info "Installing/updating Corsy..."
+if [[ -d /opt/Corsy/.git ]]; then
+    git -C /opt/Corsy pull --ff-only 2>&1 | tail -2
+else
+    git clone --depth 1 https://github.com/s0md3v/Corsy /opt/Corsy 2>&1 | tail -2
+fi
+printf '#!/usr/bin/env bash\nexec python3 /opt/Corsy/corsy.py "$@"\n' > /usr/local/bin/corsy
+chmod +x /usr/local/bin/corsy
+ok "corsy → $(which corsy)"
+
 # ── DNS fix (WSL only) ────────────────────────────────────
 if grep -qi microsoft /proc/version 2>/dev/null; then
     info "WSL detected — ensuring DNS is set..."
@@ -172,7 +183,7 @@ fi
 echo ""
 echo -e "${CYAN}=== Tool check ===${RESET}"
 ALL_OK=true
-for tool in nmap nikto hydra ffuf testssl.sh jwt_tool nuclei wafw00f checkdmarc secretfinder; do
+for tool in nmap nikto hydra ffuf testssl.sh jwt_tool nuclei wafw00f checkdmarc secretfinder corsy; do
     path=$(command -v "$tool" 2>/dev/null || true)
     if [[ -n "$path" ]]; then
         ok "$tool → $path"
