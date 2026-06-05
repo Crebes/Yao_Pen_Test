@@ -1,82 +1,82 @@
 {
   "targets": [
     {
-      "url":        "https://app.stg.yao.legal",
-      "mode":       "staging",
+      "url": "https://app.stg.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Main SaaS app — staging"
+      "notes": "Main SaaS app \u2014 staging"
     },
     {
-      "url":        "https://backoffice.staging.yao.legal",
-      "mode":       "staging",
+      "url": "https://backoffice.staging.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Backoffice admin panel — staging"
+      "notes": "Backoffice admin panel \u2014 staging"
     },
     {
-      "url":        "https://wopi.stg.yao.legal",
-      "mode":       "staging",
+      "url": "https://wopi.stg.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "WOPI document service — staging"
+      "notes": "WOPI document service \u2014 staging"
     },
     {
-      "url":        "https://app.staging.yao.legal",
-      "mode":       "staging",
+      "url": "https://app.staging.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Main SaaS app — staging alias"
+      "notes": "Main SaaS app \u2014 staging alias"
     },
     {
-      "url":        "https://app.yao.legal",
-      "mode":       "staging",
+      "url": "https://app.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Main SaaS app — production"
+      "notes": "Main SaaS app \u2014 production"
     },
     {
-      "url":        "https://backoffice.yao.legal",
-      "mode":       "staging",
+      "url": "https://backoffice.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Backoffice admin panel — production"
+      "notes": "Backoffice admin panel \u2014 production"
     },
     {
-      "url":        "https://uk.yao.legal",
-      "mode":       "staging",
+      "url": "https://uk.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "UK regional endpoint — production"
+      "notes": "UK regional endpoint \u2014 production"
     },
     {
-      "url":        "https://aus.yao.legal",
-      "mode":       "staging",
+      "url": "https://aus.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Australia regional endpoint — production"
+      "notes": "Australia regional endpoint \u2014 production"
     },
     {
-      "url":        "https://api.staging.yao.legal",
-      "mode":       "staging",
+      "url": "https://api.staging.yao.legal",
+      "mode": "staging",
       "login_path": "/api/auth/login",
-      "notes":      "REST API — staging"
+      "notes": "REST API \u2014 staging"
     },
     {
-      "url":        "https://api.stg.yao.legal",
-      "mode":       "staging",
+      "url": "https://api.stg.yao.legal",
+      "mode": "staging",
       "login_path": "/api/auth/login",
-      "notes":      "REST API — staging alias"
+      "notes": "REST API \u2014 staging alias"
     },
     {
-      "url":        "https://api.yao.legal",
-      "mode":       "staging",
+      "url": "https://api.yao.legal",
+      "mode": "staging",
       "login_path": "/api/auth/login",
-      "notes":      "REST API — production"
+      "notes": "REST API \u2014 production"
     },
     {
-      "url":        "https://demo.yao.legal",
-      "mode":       "staging",
+      "url": "https://demo.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "Demo environment"
+      "notes": "Demo environment"
     },
     {
-      "url":        "https://wopi.yao.legal",
-      "mode":       "staging",
+      "url": "https://wopi.yao.legal",
+      "mode": "staging",
       "login_path": "/auth/login",
-      "notes":      "WOPI document service — production"
+      "notes": "WOPI document service \u2014 production"
     }
   ]
 }
