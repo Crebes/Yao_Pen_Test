@@ -386,15 +386,30 @@ HTML = r"""<!DOCTYPE html>
       <div style="font-size:1.8em;font-weight:800;color:#2ecc71;" id="done-count">—</div>
       <div style="font-size:0.72em;color:#64a6d6;" id="done-label">of — targets</div>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;align-items:center;">
+      <div style="display:flex;align-items:center;gap:6px;">
+        <label style="font-size:0.75em;color:#64a6d6;font-weight:600;white-space:nowrap;">Parallel:</label>
+        <select id="parallel-count-header" style="background:#0f2030;border:1px solid #2980b9;border-radius:6px;padding:5px 8px;color:#e2e8f0;font-size:0.8em;">
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4" selected>4</option>
+          <option value="6">6</option>
+          <option value="13">All</option>
+        </select>
+      </div>
+      <button id="start-btn" onclick="headerStartScan()"
+        style="background:#27ae60;color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;cursor:pointer;white-space:nowrap;">
+        &#x25B6; Start Scan
+      </button>
       <button id="stop-btn" onclick="stopScan()"
         style="background:#555;color:#aaa;border:none;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;cursor:not-allowed;white-space:nowrap;"
         disabled title="No scan running">
-        &#x23F9; Stop Scan
+        &#x23F9; Stop
       </button>
       <a href="/export" download
          style="background:#2980b9;color:#fff;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:7px;white-space:nowrap;">
-        &#x2B07; Export Report
+        &#x2B07; Export
       </a>
     </div>
   </div>
@@ -970,6 +985,21 @@ async function loadHistory() {
   document.getElementById("history-runs").innerHTML = runsHtml;
 }
 
+async function headerStartScan() {
+  const parallel = document.getElementById("parallel-count-header")?.value || "4";
+  const btn = document.getElementById("start-btn");
+  btn.disabled = true; btn.textContent = "Launching...";
+  try {
+    const res  = await fetch("/run-batch", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({parallel})});
+    const data = await res.json();
+    if (!data.ok) { alert(data.message); }
+    showTab("scan");
+  } catch(e) { alert("Error: " + e.message); }
+  finally { btn.disabled = false; btn.textContent = "▶ Start Scan"; }
+}
+
 async function stopScan() {
   const stopBtn = document.getElementById("stop-btn");
   const msg = document.getElementById("stop-msg");
@@ -1132,13 +1162,15 @@ async function refresh() {
     document.getElementById("no-scan-banner").style.display   = (!hasTargets || (!isRunning && !status.complete)) ? "block" : "none";
     if (isRunning || status.complete) document.getElementById("no-scan-banner").style.display = "none";
     // Stop button — active (red) when scanning, greyed when idle
-    const stopBtn = document.getElementById("stop-btn");
+    const stopBtn  = document.getElementById("stop-btn");
+    const startBtn = document.getElementById("start-btn");
     if (isRunning && !status.complete) {
       stopBtn.disabled = false;
       stopBtn.style.background = "#c0392b";
       stopBtn.style.color = "#fff";
       stopBtn.style.cursor = "pointer";
       stopBtn.title = "Stop the running scan";
+      if (startBtn) { startBtn.disabled = true; startBtn.style.background = "#555"; startBtn.style.color = "#aaa"; startBtn.style.cursor = "not-allowed"; }
       // Also show the inline banner
       const stopBanner = document.getElementById("stop-banner");
       if (stopBanner) { stopBanner.style.display = "flex"; }
@@ -1150,6 +1182,7 @@ async function refresh() {
       stopBtn.style.color = "#aaa";
       stopBtn.style.cursor = "not-allowed";
       stopBtn.title = "No scan running";
+      if (startBtn) { startBtn.disabled = false; startBtn.style.background = "#27ae60"; startBtn.style.color = "#fff"; startBtn.style.cursor = "pointer"; }
       const stopBanner = document.getElementById("stop-banner");
       if (stopBanner) stopBanner.style.display = "none";
     }
