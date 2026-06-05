@@ -805,7 +805,12 @@ function showTab(name) {
   document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
   document.querySelectorAll(".tab").forEach(el => el.classList.remove("active"));
   document.getElementById("tab-"+name).classList.add("active");
-  event.target.classList.add("active");
+  // Mark the clicked tab active by finding it from the tab name
+  document.querySelectorAll(".tab").forEach(el => {
+    if (el.getAttribute("onclick") && el.getAttribute("onclick").includes("'"+name+"'")) {
+      el.classList.add("active");
+    }
+  });
 }
 
 async function checkTools() {
@@ -1019,7 +1024,7 @@ async function stopScan() {
 
 async function startBatchFromProgress() {
   const msg = document.getElementById("start-scan-msg");
-  const btn = event.target;
+  const btn = document.querySelector('#no-scan-banner button');
   const parallel = document.getElementById("parallel-count-main")?.value || "4";
   btn.disabled = true;
   btn.textContent = "Launching...";
