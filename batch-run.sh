@@ -8,15 +8,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGETS_JSON="$SCRIPT_DIR/targets.json"
 MAX_PARALLEL="${MAX_PARALLEL:-4}"
 
+# ── Single-instance lock — prevent two batches running at once ─
+GLOBAL_LOCK="$SCRIPT_DIR/.batch.lock"
+exec 8>"$GLOBAL_LOCK"
+if ! flock -n 8; then
+    echo "Another batch scan is already running. Exiting."
+    exit 1
+fi
+
 # ── Checkpoint: resume or start fresh ─────────────────────
 RESUME_DIR=""
 for d in "$SCRIPT_DIR"/batch_*/; do
-    if [[ -f "$d/checkpoint.json" && ! -f "$d/batch_complete" ]]; then
+    d="${d%/}"  # strip trailing slash
+    if [[ -d "$d" && -f "$d/checkpoint.json" && ! -f "$d/batch_complete" ]]; then
         RESUME_DIR="$d"; break
     fi
 done
 
-if [[ -n "$RESUME_DIR" ]]; then
+if [[ -n "$RESUME_DIR" && -d "$RESUME_DIR" ]]; then
     BATCH_DIR="$RESUME_DIR"
 else
     BATCH_DIR="$SCRIPT_DIR/batch_$(date +%Y%m%d_%H%M%S)"
