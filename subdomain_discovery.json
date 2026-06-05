@@ -1,0 +1,155 @@
+{
+  "domain": "yao.legal",
+  "results": [
+    {
+      "host": "demo.yao.legal",
+      "ip": "18.244.140.43",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://demo.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "backoffice.yao.legal",
+      "ip": "54.230.201.100",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://backoffice.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "aus.yao.legal",
+      "ip": "18.245.143.16",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://aus.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "api.yao.legal",
+      "ip": "13.42.90.25",
+      "scheme": "https",
+      "status": 404,
+      "server": "",
+      "final_url": "https://api.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "app.staging.yao.legal",
+      "ip": "18.154.84.9",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://app.staging.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "app.yao.legal",
+      "ip": "143.204.68.8",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://app.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "uk.yao.legal",
+      "ip": "143.204.68.100",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://uk.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "app.stg.yao.legal",
+      "ip": "18.154.84.32",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://app.stg.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "wopi.yao.legal",
+      "ip": "13.42.90.25",
+      "scheme": "https",
+      "status": 400,
+      "server": "",
+      "final_url": "https://wopi.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "backoffice.staging.yao.legal",
+      "ip": "52.84.118.105",
+      "scheme": "https",
+      "status": 200,
+      "server": "AmazonS3",
+      "final_url": "https://backoffice.staging.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "api.staging.yao.legal",
+      "ip": "34.193.149.47",
+      "scheme": "https",
+      "status": 404,
+      "server": "",
+      "final_url": "https://api.staging.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "wopi.stg.yao.legal",
+      "ip": "34.201.239.28",
+      "scheme": "https",
+      "status": 503,
+      "server": "awselb/2.0",
+      "final_url": "https://wopi.stg.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "wopi.staging.yao.legal",
+      "ip": "34.201.239.28",
+      "scheme": "https",
+      "status": 503,
+      "server": "awselb/2.0",
+      "final_url": "https://wopi.staging.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "api.stg.yao.legal",
+      "ip": "34.193.149.47",
+      "scheme": "https",
+      "status": 404,
+      "server": "",
+      "final_url": "https://api.stg.yao.legal/",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    },
+    {
+      "host": "wopi.host.stg.yao.legal",
+      "ip": "3.218.141.214",
+      "scheme": "?",
+      "status": null,
+      "server": "",
+      "final_url": "",
+      "mode": "staging",
+      "login_path": "/auth/login"
+    }
+  ]
+}
