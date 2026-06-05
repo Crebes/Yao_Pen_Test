@@ -124,6 +124,10 @@ def get_all_batches():
             elif url not in cp:
                 st = "not_run"
 
+            # Only show grade for actually-scanned targets
+            if st not in ("complete", "skipped"):
+                g = None
+
             targets_data.append({"url":url,"status":st,"grade":g,"counts":counts})
 
         batches.append({
@@ -241,15 +245,16 @@ def reconstruct_status(batch_dir):
             rp = os.path.join(scan_dir, "report.html")
             if os.path.exists(rp):
                 report_path = rp
-                # Grade
-                nc, nh = counts.get("CRITICAL",0), counts.get("HIGH",0)
-                risk = nc*10+nh*5+counts.get("MEDIUM",0)*2+counts.get("LOW",0)
-                if nc>=2: grade="F"
-                elif nc==1: grade="D"
-                elif nh>=3: grade="C"
-                elif nh>=1: grade="B"
-                elif risk>0: grade="B+"
-                else: grade="A"
+                # Only assign a grade for scanned (complete) targets
+                if status in ("complete", "skipped"):
+                    nc, nh = counts.get("CRITICAL",0), counts.get("HIGH",0)
+                    risk = nc*10+nh*5+counts.get("MEDIUM",0)*2+counts.get("LOW",0)
+                    if nc>=2: grade="F"
+                    elif nc==1: grade="D"
+                    elif nh>=3: grade="C"
+                    elif nh>=1: grade="B"
+                    elif risk>0: grade="B+"
+                    else: grade="A"
 
         target_states.append({
             "idx": i+1, "url": url, "mode": t["mode"],
@@ -956,11 +961,15 @@ async function loadHistory() {
     b.targets.forEach(tgt => {
       if (tgt.status === "not_run") return;
       const host = tgt.url.replace(/https?:\/\//,"");
-      const g = tgt.grade;
+      const g = (tgt.status==="complete"||tgt.status==="skipped") ? tgt.grade : null;
       const gc = g ? (GRADE_COLORS[g]||"#555") : "#555";
-      const gradeCell = g
+      const gradeCell = tgt.status==="offline"
+        ? `<span style='color:#8e44ad;font-size:0.78em;font-weight:700;'>OFFLINE</span>`
+        : tgt.status==="unreachable"
+        ? `<span style='color:#555;font-size:0.78em;'>UNREACHABLE</span>`
+        : g
         ? `<span style='background:${gc};color:#fff;padding:1px 7px;border-radius:6px;font-weight:800;font-size:0.8em;'>${g}</span>`
-        : (tgt.status==="offline"?"<span style='color:#8e44ad;font-size:0.78em;'>OFFLINE</span>":"<span style='color:#555;font-size:0.78em;'>—</span>");
+        : `<span style='color:#555;font-size:0.78em;'>—</span>`;
       const c = tgt.counts;
       targetRows += `<tr style='border-top:1px solid #e8ecf0;'>
         <td style='padding:6px 12px;font-size:0.82em;word-break:break-all;'>${host}</td>
