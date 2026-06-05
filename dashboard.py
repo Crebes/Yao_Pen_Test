@@ -993,16 +993,22 @@ async function loadHistory() {
 async function headerStartScan() {
   const parallel = document.getElementById("parallel-count-header")?.value || "4";
   const btn = document.getElementById("start-btn");
-  btn.disabled = true; btn.textContent = "Launching...";
+  if (btn) { btn.disabled = true; btn.textContent = "Launching..."; btn.style.background = "#555"; }
   try {
     const res  = await fetch("/run-batch", {method:"POST",
       headers:{"Content-Type":"application/json"},
       body: JSON.stringify({parallel})});
     const data = await res.json();
-    if (!data.ok) { alert(data.message); }
+    if (!data.ok) {
+      alert(data.message);
+      if (btn) { btn.disabled = false; btn.textContent = "▶ Start Scan"; btn.style.background = "#27ae60"; }
+    }
+    // On success: leave button grey — refresh loop will manage state
     showTab("scan");
-  } catch(e) { alert("Error: " + e.message); }
-  finally { btn.disabled = false; btn.textContent = "▶ Start Scan"; }
+  } catch(e) {
+    alert("Error: " + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = "▶ Start Scan"; btn.style.background = "#27ae60"; }
+  }
 }
 
 async function stopScan() {
@@ -1132,6 +1138,11 @@ async function refresh() {
       document.getElementById("done-count").textContent = "—";
       document.getElementById("done-label").textContent = "";
       document.getElementById("grid").innerHTML = "";
+      // Re-enable start button when no scan found
+      const sb = document.getElementById("start-btn");
+      if (sb) { sb.disabled = false; sb.textContent = "▶ Start Scan"; sb.style.background = "#27ae60"; sb.style.color = "#fff"; sb.style.cursor = "pointer"; }
+      const stopB = document.getElementById("stop-btn");
+      if (stopB) { stopB.disabled = true; stopB.style.background = "#555"; stopB.style.color = "#aaa"; stopB.style.cursor = "not-allowed"; }
       return;
     }
 
