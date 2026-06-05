@@ -169,17 +169,17 @@ def reconstruct_status(batch_dir):
             else:
                 status = "complete"
         else:
-            # In parallel mode, multiple targets can be running at once
-            # A target is "running" if it has a recent scan dir being modified
-            if scan_dir and not complete:
+            if complete:
+                # Batch finished but this target isn't in checkpoint = did not complete
+                status = "not_run"
+            elif scan_dir:
                 import time as _time
-                mtime = os.path.getmtime(scan_dir)
-                age   = _time.time() - mtime
-                status = "running" if age < 1800 else "queued"  # active in last 30 min
+                age = _time.time() - os.path.getmtime(scan_dir)
+                status = "running" if age < 1800 else "queued"
+                if status == "running":
+                    running_idx = i
             else:
-                status = "queued" if not complete else "queued"
-            if status == "running":
-                running_idx = i
+                status = "queued"
 
         # Read findings from summary.json
         counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
