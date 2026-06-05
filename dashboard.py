@@ -235,9 +235,16 @@ HTML = r"""<!DOCTYPE html>
     <div class="sub" id="batch-dir">Loading...</div>
     <div class="tick" id="last-tick">Connecting...</div>
   </div>
-  <div style="text-align:right;">
-    <div style="font-size:1.8em;font-weight:800;color:#2ecc71;" id="done-count">—</div>
-    <div style="font-size:0.72em;color:#64a6d6;" id="done-label">of — targets</div>
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+    <div style="text-align:right;">
+      <div style="font-size:1.8em;font-weight:800;color:#2ecc71;" id="done-count">—</div>
+      <div style="font-size:0.72em;color:#64a6d6;" id="done-label">of — targets</div>
+    </div>
+    <a href="/export" download
+       style="background:#2980b9;color:#fff;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:7px;white-space:nowrap;"
+       title="Download full HTML report with all findings and parameters">
+      &#x2B07; Export Report
+    </a>
   </div>
 </div>
 
@@ -721,6 +728,246 @@ setInterval(refresh, 3000);
 </body>
 </html>"""
 
+SEV_COLOR = {"CRITICAL":"#c0392b","HIGH":"#e67e22","MEDIUM":"#d4a017","LOW":"#27ae60","INFO":"#2980b9"}
+SEV_BG    = {"CRITICAL":"#fdf0ef","HIGH":"#fef6ee","MEDIUM":"#fefde8","LOW":"#edfaf1","INFO":"#eaf4fb"}
+SEV_ORDER = {"CRITICAL":0,"HIGH":1,"MEDIUM":2,"LOW":3,"INFO":4}
+PRIORITY  = {"CRITICAL":"P0 — Fix within 24 hours","HIGH":"P1 — Fix within 1 week",
+             "MEDIUM":"P2 — Fix within 1 month","LOW":"P3 — Fix in next sprint","INFO":"Informational"}
+
+def _esc(s): return str(s).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"','&quot;')
+def _code(c): return f'<pre style="background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:5px;overflow-x:auto;font-size:0.8em;line-height:1.5;margin:8px 0;">{_esc(c)}</pre>'
+
+def grade(nc, nh, nm):
+    risk = nc*10 + nh*5 + nm*2
+    if nc>=2: return ("F","#c0392b")
+    if nc==1: return ("D","#e74c3c")
+    if nh>=3: return ("C","#e67e22")
+    if nh>=1: return ("B","#f39c12")
+    if risk>0: return ("B+","#2ecc71")
+    return ("A","#27ae60")
+
+def generate_export_report():
+    """Build a full HTML report across all batch scan targets."""
+    import datetime as dt
+    status = get_status()
+    if "error" in status:
+        return f"<html><body>{status['error']}</body></html>"
+
+    ts = dt.datetime.now().strftime("%d %B %Y, %H:%M")
+    targets = status.get("targets", [])
+
+    # ── per-target summary rows ──────────────────────────────
+    summary_rows = ""
+    for t in targets:
+        url  = t["url"]; mode = t["mode"]; st = t["status"]
+        c    = t.get("counts",{})
+        nc   = c.get("CRITICAL",0); nh = c.get("HIGH",0)
+        nm   = c.get("MEDIUM",0);   nl = c.get("LOW",0)
+        mc   = "#b45309" if mode=="staging" else "#1a7a4a"
+
+        if st == "offline":
+            grade_cell = "<span style='background:#8e44ad;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em;font-weight:700;'>OFFLINE</span>"
+            counts_cell = "<span style='color:#aaa;'>Service was down — not scanned</span>"
+        elif st == "unreachable":
+            grade_cell = "<span style='background:#555;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em;font-weight:700;'>UNREACHABLE</span>"
+            counts_cell = "<span style='color:#aaa;'>DNS failed — not scanned</span>"
+        elif st in ("complete","skipped"):
+            g, gc = grade(nc,nh,nm)
+            grade_cell = f"<span style='background:{gc};color:#fff;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;font-size:0.85em;'>{g}</span>"
+            def cv(n,sev): return f"<span style='color:{SEV_COLOR[sev]};font-weight:700;'>{n}</span>" if n else "0"
+            counts_cell = f"CRIT:{cv(nc,'CRITICAL')} &nbsp; HIGH:{cv(nh,'HIGH')} &nbsp; MED:{cv(nm,'MEDIUM')} &nbsp; LOW:{cv(nl,'LOW')}"
+        else:
+            grade_cell = "<span style='color:#3498db;'>SCANNING...</span>"
+            counts_cell = "—"
+
+        summary_rows += f"""<tr>
+          <td style='padding:10px 14px;font-weight:600;word-break:break-all;'>{_esc(url)}</td>
+          <td style='padding:10px 14px;'><span style='background:{mc};color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em;font-weight:700;'>{mode.upper()}</span></td>
+          <td style='padding:10px 14px;text-align:center;'>{grade_cell}</td>
+          <td style='padding:10px 14px;font-size:0.88em;'>{counts_cell}</td>
+        </tr>"""
+
+    # ── all findings across all targets ──────────────────────
+    all_findings_html = ""
+    for t in targets:
+        if t["status"] not in ("complete","skipped"): continue
+        scan_dir = t.get("scan_dir","")
+        if not scan_dir or not os.path.exists(os.path.join(scan_dir,"summary.json")):
+            continue
+        try:
+            s = json.load(open(os.path.join(scan_dir,"summary.json")))
+            findings = sorted(s.get("findings",[]), key=lambda f: SEV_ORDER.get(f.get("severity","INFO"),99))
+            if not findings: continue
+
+            cards = ""
+            for f in findings:
+                sev   = f.get("severity","INFO")
+                color = SEV_COLOR.get(sev,"#555")
+                bg    = SEV_BG.get(sev,"#fff")
+                plabel= PRIORITY.get(sev,"")
+                steps_html = ""
+                for h_,b_ in f.get("steps",[]):
+                    steps_html += f'<div style="margin-top:12px;"><div style="font-size:0.75em;text-transform:uppercase;letter-spacing:0.5px;color:#888;font-weight:700;margin-bottom:4px;">{_esc(h_)}</div>{_code(b_)}</div>'
+                refs_html = ""
+                if f.get("refs"):
+                    refs_html = "<div style='margin-top:8px;font-size:0.82em;'><strong>References:</strong> " + " &nbsp;·&nbsp; ".join(
+                        f"<a href='{_esc(href)}' style='color:#2980b9;'>{_esc(label)}</a>" for label,href in f["refs"]
+                    ) + "</div>"
+                cards += f"""<div style="background:{bg};border-left:4px solid {color};border-radius:6px;padding:14px 18px;margin-bottom:12px;">
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+                    <span style="background:{color};color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75em;font-weight:700;">{sev}</span>
+                    <span style="background:#f0f3f7;color:#555;padding:2px 8px;border-radius:8px;font-size:0.75em;">{_esc(f.get('tool',''))}</span>
+                    <span style="font-size:0.75em;color:{color};font-weight:600;">{_esc(plabel)}</span>
+                  </div>
+                  <div style="font-weight:700;margin-top:8px;font-size:0.95em;">{_esc(f.get('title',''))}</div>
+                  <div style="color:#555;font-size:0.85em;margin-top:4px;line-height:1.6;">{_esc(f.get('detail',''))}</div>
+                  {steps_html}{refs_html}
+                </div>"""
+
+            g_lbl, gc = grade(t.get("counts",{}).get("CRITICAL",0),t.get("counts",{}).get("HIGH",0),t.get("counts",{}).get("MEDIUM",0))
+            all_findings_html += f"""
+            <div style="margin-bottom:32px;">
+              <div style="display:flex;align-items:center;gap:14px;padding:14px 20px;background:#1a1a2e;border-radius:8px;margin-bottom:14px;">
+                <div style="background:{gc};color:#fff;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:0.9em;flex-shrink:0;">{g_lbl}</div>
+                <div>
+                  <div style="font-weight:700;color:#fff;font-size:1em;">{_esc(t['url'])}</div>
+                  <div style="color:#888;font-size:0.8em;margin-top:2px;">{len(findings)} finding(s)</div>
+                </div>
+              </div>
+              {cards}
+            </div>"""
+        except Exception:
+            continue
+
+    # ── parameters table ─────────────────────────────────────
+    params_rows = ""
+    modules = [
+        ("1a","nmap","Port scan & service fingerprinting","nmap -sV -sC --open -p 21,22,25,80,443,3306,5432,6379,8080,8443,9200,27017 -oN nmap.txt <host>","ALL"),
+        ("1b","nmap","Vulnerability scripts","nmap --script vuln -p <port> -oN nmap_vuln.txt <host>","ALL"),
+        ("2","nikto","Web server misconfiguration & headers","nikto -h <url> -ssl -port 443 -output nikto.txt -Format txt -maxtime 300","ALL"),
+        ("3","testssl.sh","TLS/SSL — protocols, ciphers, BREACH, HSTS","testssl.sh --jsonfile testssl.json <host>:<port>","ALL"),
+        ("4","ffuf","Hidden endpoint discovery","ffuf -u <url>/FUZZ -w wordlist.txt -mc 200,201,204,301,302,403,404 -ic -ac -t 40 -fs <baseline>","ALL"),
+        ("5a","Rate-limit check","15 rapid POSTs to detect throttling","POST <url><login_path> ×15  body: username=dummy&password=wrong  interval: 100ms","STAGING"),
+        ("5b","hydra","Credential brute-force","hydra -L usernames.txt -P passwords.txt -s <port> <host> https-post-form \"<path>:user=^USER^&pass=^PASS^:F=Invalid\" -t 4","STAGING"),
+        ("6","jwt_tool","JWT token analysis","jwt_tool <token> -t","ALL"),
+        ("7","nuclei","CVE & misconfiguration scanner","nuclei -u <url> -t cves,exposures,misconfiguration,default-logins,technologies -json -rate-limit 10 -timeout 10","ALL"),
+        ("8","wafw00f","WAF/CDN detection","wafw00f <url> -a -o wafw00f.txt","ALL"),
+        ("9","checkdmarc","Email security (SPF/DKIM/DMARC)","checkdmarc <base-domain> --format json -o checkdmarc.json","ALL"),
+        ("10","SecretFinder","JavaScript bundle secret scanner","python3 SecretFinder.py -i <url> -o cli","ALL"),
+    ]
+    for num, tool, purpose, cmd, modes in modules:
+        mc2 = "#1a7a4a" if modes=="ALL" else "#b45309"
+        params_rows += f"""<tr style="border-top:1px solid #e8ecf0;">
+          <td style="padding:9px 12px;color:#2980b9;font-weight:700;white-space:nowrap;">{num}</td>
+          <td style="padding:9px 12px;font-weight:700;white-space:nowrap;">{_esc(tool)}</td>
+          <td style="padding:9px 12px;color:#555;font-size:0.88em;">{_esc(purpose)}</td>
+          <td style="padding:9px 12px;"><code style="background:#f4f6f9;padding:3px 6px;border-radius:4px;font-size:0.8em;word-break:break-all;">{_esc(cmd)}</code></td>
+          <td style="padding:9px 12px;"><span style="background:{mc2};color:#fff;padding:2px 8px;border-radius:8px;font-size:0.72em;font-weight:700;">{modes}</span></td>
+        </tr>"""
+
+    total_c = sum(t.get("counts",{}).get("CRITICAL",0) for t in targets if t["status"] in ("complete","skipped"))
+    total_h = sum(t.get("counts",{}).get("HIGH",0)     for t in targets if t["status"] in ("complete","skipped"))
+    total_m = sum(t.get("counts",{}).get("MEDIUM",0)   for t in targets if t["status"] in ("complete","skipped"))
+    total_l = sum(t.get("counts",{}).get("LOW",0)      for t in targets if t["status"] in ("complete","skipped"))
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Yao Security Assessment — Batch Report {ts}</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f4f6f9;color:#2c3e50;font-size:14px;line-height:1.5}}
+  a{{color:#2980b9}}
+  .hdr{{background:linear-gradient(135deg,#0f1923 0%,#1a2a3a 60%,#0f3460 100%);color:#fff;padding:32px 44px}}
+  .hdr h1{{font-size:1.7em;font-weight:700}}
+  .hdr .sub{{color:#a8c6e8;margin-top:4px;font-size:0.88em}}
+  .meta{{margin-top:14px;display:flex;gap:24px;flex-wrap:wrap}}
+  .mi{{font-size:0.8em;color:#c8ddf0}}.mi strong{{color:#fff;display:block;font-size:1.05em}}
+  .con{{max-width:1100px;margin:0 auto;padding:24px 18px}}
+  .card{{background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.07);padding:22px 26px;margin-bottom:20px}}
+  .card h2{{font-size:1.05em;font-weight:700;color:#1a1a2e;border-bottom:2px solid #e8ecf0;padding-bottom:8px;margin-bottom:14px}}
+  .totals{{display:flex;gap:28px;flex-wrap:wrap;margin-bottom:4px}}
+  .tot .n{{font-size:1.8em;font-weight:800}}.tot .l{{font-size:0.7em;font-weight:700;text-transform:uppercase}}
+  table{{width:100%;border-collapse:collapse}}
+  th{{background:#f0f3f7;text-align:left;padding:9px 12px;font-size:0.76em;text-transform:uppercase;letter-spacing:.5px;color:#666}}
+  td{{padding:10px 12px;border-bottom:1px solid #f0f3f7;vertical-align:top}}
+  tr:last-child td{{border-bottom:none}}
+  .footer{{text-align:center;color:#aaa;font-size:0.76em;padding:18px}}
+  @media print{{body{{background:#fff}}.card{{box-shadow:none;border:1px solid #e0e0e0}}}}
+</style>
+</head>
+<body>
+<div class="hdr">
+  <h1>&#x1F6E1; Security Assessment — All Targets</h1>
+  <div class="sub">Yao Pentest Wizard &nbsp;·&nbsp; Batch export generated {ts}</div>
+  <div class="meta">
+    <div class="mi"><strong>{len(targets)}</strong>Targets</div>
+    <div class="mi"><strong>{sum(1 for t in targets if t['status'] in ('complete','skipped'))}</strong>Scanned</div>
+    <div class="mi"><strong>{sum(1 for t in targets if t['status']=='offline')}</strong>Offline</div>
+    <div class="mi"><strong>{sum(1 for t in targets if t['status']=='unreachable')}</strong>Unreachable</div>
+    <div class="mi"><strong>{ts}</strong>Generated</div>
+  </div>
+</div>
+<div class="con">
+
+  <div class="card">
+    <h2>&#x1F4CA; Combined Finding Totals</h2>
+    <div class="totals">
+      <div class="tot"><div class="n" style="color:#c0392b;">{total_c}</div><div class="l" style="color:#c0392b;">Critical</div></div>
+      <div class="tot"><div class="n" style="color:#e67e22;">{total_h}</div><div class="l" style="color:#e67e22;">High</div></div>
+      <div class="tot"><div class="n" style="color:#d4a017;">{total_m}</div><div class="l" style="color:#d4a017;">Medium</div></div>
+      <div class="tot"><div class="n" style="color:#27ae60;">{total_l}</div><div class="l" style="color:#27ae60;">Low</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:0.8em;color:#888;">
+      Grade scale: &nbsp;
+      <span style="background:#27ae60;color:#fff;padding:1px 7px;border-radius:6px;font-weight:700;">A</span> No HIGH/CRIT &nbsp;
+      <span style="background:#f39c12;color:#fff;padding:1px 7px;border-radius:6px;font-weight:700;">B</span> 1–2 HIGH &nbsp;
+      <span style="background:#e67e22;color:#fff;padding:1px 7px;border-radius:6px;font-weight:700;">C</span> 3+ HIGH &nbsp;
+      <span style="background:#e74c3c;color:#fff;padding:1px 7px;border-radius:6px;font-weight:700;">D</span> 1 CRITICAL &nbsp;
+      <span style="background:#c0392b;color:#fff;padding:1px 7px;border-radius:6px;font-weight:700;">F</span> 2+ CRITICAL
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>&#x1F50D; Target Summary</h2>
+    <table>
+      <thead><tr><th>Target URL</th><th>Mode</th><th style="text-align:center;">Grade</th><th>Findings</th></tr></thead>
+      <tbody>{summary_rows}</tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>&#x1F9EA; Tools &amp; Parameters Run</h2>
+    <p style="color:#555;font-size:0.85em;margin-bottom:12px;">Every command executed during this assessment, with exact flags.</p>
+    <table>
+      <thead><tr><th>#</th><th>Tool</th><th>Purpose</th><th>Command &amp; Parameters</th><th>Mode</th></tr></thead>
+      <tbody>{params_rows}</tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>&#x1F50D; Findings by Target — Full Detail</h2>
+    <p style="color:#555;font-size:0.85em;margin-bottom:16px;">
+      All findings with technical descriptions and DevOps remediation steps.
+    </p>
+    {all_findings_html if all_findings_html else "<p style='color:#888;'>No findings loaded — scans may still be in progress.</p>"}
+  </div>
+
+  <div class="card" style="border-left:4px solid #e67e22;">
+    <h2>&#x26A0;&#xFE0F; Disclaimer</h2>
+    <p style="color:#555;line-height:1.7;font-size:0.88em;">
+      This report was generated automatically. All findings require manual verification before remediation.
+      This does not constitute a professional penetration test. For regulated environments, engage a
+      qualified security professional (CREST, CHECK, or equivalent accreditation).
+    </p>
+  </div>
+
+</div>
+<div class="footer">Yao Pentest Wizard &nbsp;·&nbsp; {ts} &nbsp;·&nbsp; For authorised use only</div>
+</body></html>"""
+    return html
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args): pass  # suppress request logging
 
@@ -826,9 +1073,23 @@ class Handler(BaseHTTPRequestHandler):
 
         elif path == "/tools":
             import shutil
-            tools = ["nmap","nikto","hydra","ffuf","testssl.sh","jwt_tool"]
+            tools = ["nmap","nikto","hydra","ffuf","testssl.sh","jwt_tool",
+                     "nuclei","wafw00f","checkdmarc","secretfinder"]
             result = {t: shutil.which(t) or "" for t in tools}
             self.send_json(result)
+
+        elif path == "/export":
+            import datetime as dt
+            html = generate_export_report()
+            fname = f"yao-pentest-report-{dt.datetime.now().strftime('%Y%m%d-%H%M')}.html"
+            body  = html.encode("utf-8", errors="replace")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", len(body))
+            self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
 
         elif path == "/report":
             qs = parse_qs(parsed.query)
