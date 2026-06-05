@@ -268,8 +268,21 @@ HTML = r"""<!DOCTYPE html>
 </div>
 
 <div class="con">
+  <!-- No scan running -->
+  <div id="no-scan-banner" style="display:none;background:#1a2a3a;border:2px dashed #2980b9;border-radius:12px;padding:32px;text-align:center;margin-bottom:20px;">
+    <div style="font-size:2em;margin-bottom:10px;">&#x1F6E1;</div>
+    <div style="font-size:1.2em;font-weight:700;color:#fff;margin-bottom:6px;">No scan running</div>
+    <div style="color:#64a6d6;font-size:0.88em;margin-bottom:20px;">Start a new batch scan against all targets in targets.json</div>
+    <button onclick="startBatchFromProgress()" class="btn btn-success" style="font-size:1em;padding:12px 32px;">
+      &#x25B6; Start Batch Scan
+    </button>
+    <div id="start-scan-msg" style="margin-top:12px;font-size:0.82em;color:#64a6d6;"></div>
+  </div>
+
+  <!-- Complete -->
   <div id="complete-banner" style="display:none;" class="complete-banner">
-    &#x2705; Batch scan complete — all targets processed.
+    &#x2705; Batch scan complete — all targets processed. &nbsp;
+    <a href="/export" download style="color:#2ecc71;text-decoration:underline;font-size:0.9em;">&#x2B07; Download Report</a>
   </div>
   <div class="grid" id="grid"></div>
   <div class="log-section">
@@ -597,6 +610,30 @@ async function runBatch() {
   if(data.ok) showTab("scan");
 }
 
+async function startBatchFromProgress() {
+  const msg = document.getElementById("start-scan-msg");
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = "Launching...";
+  msg.textContent = "Starting scan — this page will update automatically...";
+  try {
+    const res  = await fetch("/run-batch", {method:"POST"});
+    const data = await res.json();
+    if (data.ok) {
+      msg.textContent = "Scan launched. Progress will appear below in a few seconds.";
+      document.getElementById("no-scan-banner").style.display = "none";
+    } else {
+      msg.textContent = "Error: " + data.message;
+      btn.disabled = false;
+      btn.textContent = "▶ Start Batch Scan";
+    }
+  } catch(e) {
+    msg.textContent = "Connection error: " + e.message;
+    btn.disabled = false;
+    btn.textContent = "▶ Start Batch Scan";
+  }
+}
+
 async function runSingleScan() {
   const url  = document.getElementById("scan-url").value.trim();
   const mode = document.getElementById("scan-mode").value;
@@ -701,8 +738,12 @@ async function refresh() {
       cs.style.display = "none";
     }
 
-    // Complete banner
-    document.getElementById("complete-banner").style.display = status.complete ? "block" : "none";
+    // Banners
+    const hasTargets = (status.targets || []).length > 0;
+    const isRunning  = (status.targets || []).some(t => t.status === "running");
+    document.getElementById("complete-banner").style.display  = (status.complete && hasTargets) ? "block" : "none";
+    document.getElementById("no-scan-banner").style.display   = (!hasTargets || (!isRunning && !status.complete)) ? "block" : "none";
+    if (isRunning || status.complete) document.getElementById("no-scan-banner").style.display = "none";
 
     // Target grid
     const grid = document.getElementById("grid");
