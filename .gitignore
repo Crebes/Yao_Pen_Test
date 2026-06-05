@@ -1,5 +1,9 @@
 # Scan output directories
 pentest_*/
+batch_*/
+
+# Batch lock file
+.batch.lock
 
 # Python cache
 __pycache__/
