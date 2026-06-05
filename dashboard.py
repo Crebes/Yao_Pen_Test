@@ -243,7 +243,8 @@ HTML = r"""<!DOCTYPE html>
 
 <div class="tabs">
   <div class="tab active" onclick="showTab('scan')">&#x1F4CA; Scan Progress</div>
-  <div class="tab" onclick="showTab('setup')">&#x2699;&#xFE0F; Setup &amp; Tools</div>
+  <div class="tab" onclick="showTab('tools')">&#x1F527; Tools &amp; Parameters</div>
+  <div class="tab" onclick="showTab('setup')">&#x2699;&#xFE0F; Setup</div>
 </div>
 
 <div id="tab-scan" class="tab-content active">
@@ -274,6 +275,216 @@ HTML = r"""<!DOCTYPE html>
 </div>
 
 </div><!-- end tab-scan -->
+
+<div id="tab-tools" class="tab-content">
+<div class="setup-con" style="max-width:1060px;">
+
+  <div class="setup-card">
+    <h3>&#x1F4CB; All Modules — Tools &amp; Exact Parameters</h3>
+    <p style="margin-bottom:16px;">Every command run during a full staging scan, in execution order.
+    Parameters shown as passed; <code style="background:#0f2030;padding:1px 5px;border-radius:3px;">&lt;target&gt;</code> is substituted at runtime.</p>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82em;">
+      <thead>
+        <tr style="background:#0f2030;">
+          <th style="padding:10px 12px;text-align:left;color:#64a6d6;font-size:0.8em;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;">#</th>
+          <th style="padding:10px 12px;text-align:left;color:#64a6d6;font-size:0.8em;text-transform:uppercase;letter-spacing:.5px;">Tool</th>
+          <th style="padding:10px 12px;text-align:left;color:#64a6d6;font-size:0.8em;text-transform:uppercase;letter-spacing:.5px;">Purpose</th>
+          <th style="padding:10px 12px;text-align:left;color:#64a6d6;font-size:0.8em;text-transform:uppercase;letter-spacing:.5px;">Command &amp; Parameters</th>
+          <th style="padding:10px 12px;text-align:left;color:#64a6d6;font-size:0.8em;text-transform:uppercase;letter-spacing:.5px;">Modes</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-top:1px solid #1e3a5f;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">1a</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">nmap</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Port scan &amp; service fingerprinting</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">nmap -sV -sC --open \
+  -p 21,22,25,80,443,3306,5432,6379,8080,8443,9200,27017 \
+  -oN nmap.txt &lt;host&gt;</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-sV</b> version detection &nbsp;·&nbsp; <b>-sC</b> default scripts &nbsp;·&nbsp;
+            <b>--open</b> show open ports only &nbsp;·&nbsp; <b>-p</b> scan these ports only
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">1b</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">nmap</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Known vulnerability scripts</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">nmap --script vuln \
+  -p &lt;port&gt; -oN nmap_vuln.txt &lt;host&gt;</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>--script vuln</b> runs the full vulnerability script library against the target port
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">2</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">nikto</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Web server misconfiguration &amp; missing security headers</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">nikto -h &lt;url&gt; \
+  -ssl -port 443 \
+  -output nikto.txt -Format txt \
+  -maxtime 300</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-ssl</b> force HTTPS &nbsp;·&nbsp; <b>-maxtime 300</b> 5-minute cap per host
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">3</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">testssl.sh</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">TLS/SSL protocols, ciphers, certificates, BREACH, HSTS</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">testssl.sh \
+  --jsonfile testssl.json \
+  &lt;host&gt;:&lt;port&gt;</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>--jsonfile</b> structured JSON output for parsing &nbsp;·&nbsp;
+            Tests all 4 CloudFront IPs; results are deduplicated by check ID
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">4</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">ffuf</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Hidden endpoint &amp; directory discovery</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">ffuf -u &lt;url&gt;/FUZZ \
+  -w yao_ffuf_wordlist.txt \
+  -mc 200,201,204,301,302,403,404 \
+  -ic -ac -t 40 \
+  -fs &lt;baseline_size&gt; \
+  -o ffuf.json -of json</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-ic</b> ignore wordlist comment lines &nbsp;·&nbsp;
+            <b>-ac</b> auto-calibrate to filter SPA catch-all responses &nbsp;·&nbsp;
+            <b>-fs</b> filter by baseline response size (auto-detected) &nbsp;·&nbsp;
+            <b>-t 40</b> 40 concurrent threads
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">5a</td>
+          <td style="padding:10px 12px;font-weight:700;color:#e67e22;white-space:nowrap;">Rate-limit check</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">15 rapid login attempts to detect throttling before brute-force</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">POST &lt;url&gt;&lt;login_path&gt;  ×15 rapid requests
+  Content-Type: application/x-www-form-urlencoded
+  Body: username=ratelimitcheck_dummy&amp;password=wrongpassword123
+  Interval: 100ms between requests</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            Checks for: HTTP 429, Retry-After header, progressive slowdown, response body change
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#b45309;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">STAGING</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">5b</td>
+          <td style="padding:10px 12px;font-weight:700;color:#e67e22;white-space:nowrap;">hydra</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Credential brute-force against login endpoint</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">hydra -L yao_usernames.txt -P passwords.txt \
+  -s &lt;port&gt; &lt;host&gt; https-post-form \
+  "&lt;login_path&gt;:username=^USER^&amp;password=^PASS^:F=Invalid" \
+  -t 4 -o hydra.txt</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-t 4</b> 4 threads &nbsp;·&nbsp; <b>https-post-form</b> TLS-aware form POST &nbsp;·&nbsp;
+            <b>F=Invalid</b> failure string &nbsp;·&nbsp; 27 Yao usernames × wordlist passwords
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#b45309;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">STAGING</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">6</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">jwt_tool</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">JWT token analysis — alg:none, weak secrets, expiry</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">jwt_tool &lt;token&gt; -t</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-t</b> tamper mode — tests alg:none bypass, HS256 weakness, expiry enforcement.
+            Requires a valid JWT from the target (pasted interactively).
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">7</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">nuclei</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">CVE scanner, misconfigurations, exposed files, default credentials (9,000+ templates)</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">nuclei -u &lt;url&gt; \
+  -t cves,exposures,misconfiguration,default-logins,technologies \
+  -json -o nuclei.jsonl \
+  -silent -no-color \
+  -timeout 10 \
+  -rate-limit 10</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-t</b> template categories &nbsp;·&nbsp;
+            <b>-rate-limit 10</b> 10 req/s — respectful of target &nbsp;·&nbsp;
+            <b>-timeout 10</b> per-request timeout
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">8</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">wafw00f</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">WAF/CDN detection — identifies protection layer in front of the target</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">wafw00f &lt;url&gt; -a -o wafw00f.txt</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>-a</b> test all WAF fingerprints (not just first match) &nbsp;·&nbsp;
+            No active probing — fingerprints via HTTP response headers and behaviour
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">9</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">checkdmarc</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Email security — SPF, DKIM, DMARC records. Catches email spoofing risk.</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">checkdmarc &lt;base-domain&gt; \
+  --format json -o checkdmarc.json</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            <b>&lt;base-domain&gt;</b> extracted from target host (e.g. app.stg.yao.legal → yao.legal) &nbsp;·&nbsp;
+            Passive DNS queries only — no traffic to the web server
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+        <tr style="border-top:1px solid #1e3a5f;">
+          <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">10</td>
+          <td style="padding:10px 12px;font-weight:700;color:#2ecc71;white-space:nowrap;">SecretFinder</td>
+          <td style="padding:10px 12px;color:#8fb3c8;">Scans JavaScript bundles for API keys, AWS credentials, tokens, private keys</td>
+          <td style="padding:10px 12px;"><code style="background:#0f2030;color:#cdd6f4;padding:4px 8px;border-radius:4px;display:block;white-space:pre-wrap;line-height:1.6;">python3 /opt/SecretFinder/SecretFinder.py \
+  -i &lt;url&gt; -o cli</code>
+          <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
+            Crawls the page, finds all linked <b>.js</b> files, scans each for secret patterns &nbsp;·&nbsp;
+            Detects: Google/AWS/Stripe/Slack/GitHub/Twilio API keys, private keys, Firebase config
+          </div></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1a7a4a;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">ALL</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="setup-card">
+    <h3>&#x1F512; What is NOT tested</h3>
+    <p>For full transparency — areas outside the current scan coverage:</p>
+    <table style="width:100%;border-collapse:collapse;font-size:0.82em;margin-top:8px;">
+      <tr style="border-top:1px solid #1e3a5f;">
+        <td style="padding:8px 12px;color:#e74c3c;font-weight:700;">Authenticated scanning</td>
+        <td style="padding:8px 12px;color:#8fb3c8;">All scans are unauthenticated. Vulnerabilities behind login are not tested.</td>
+      </tr>
+      <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+        <td style="padding:8px 12px;color:#e67e22;font-weight:700;">CORS misconfiguration</td>
+        <td style="padding:8px 12px;color:#8fb3c8;">Cross-origin request policy not actively tested (corsy not yet integrated).</td>
+      </tr>
+      <tr style="border-top:1px solid #1e3a5f;">
+        <td style="padding:8px 12px;color:#e67e22;font-weight:700;">Subdomain takeover</td>
+        <td style="padding:8px 12px;color:#8fb3c8;">Not tested — would require subjack or similar.</td>
+      </tr>
+      <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
+        <td style="padding:8px 12px;color:#e67e22;font-weight:700;">Business logic flaws</td>
+        <td style="padding:8px 12px;color:#8fb3c8;">Requires manual testing — cannot be automated.</td>
+      </tr>
+      <tr style="border-top:1px solid #1e3a5f;">
+        <td style="padding:8px 12px;color:#d4a017;font-weight:700;">S3 bucket exposure</td>
+        <td style="padding:8px 12px;color:#8fb3c8;">CloudFront/S3 backend bucket policy not directly assessed.</td>
+      </tr>
+    </table>
+  </div>
+
+</div>
+</div><!-- end tab-tools -->
 
 <div id="tab-setup" class="tab-content">
 <div class="setup-con">
