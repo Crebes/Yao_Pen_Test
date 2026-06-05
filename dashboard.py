@@ -68,15 +68,18 @@ def get_all_batches():
             )
             scan_dir = None
             in_cp = url in cp
-            for sd in scan_dirs:
-                sd_mtime = os.path.getmtime(sd)
-                if in_cp:
-                    # For completed targets accept any scan dir up to 24h before batch end
-                    batch_end = ts_epoch + 86400
-                    if sd_mtime <= batch_end:
-                        scan_dir = sd  # take the most recent valid one (list is sorted asc)
-                else:
-                    # For non-completed targets only look within the batch window
+            # For completed targets: most recent dir WITH a summary.json (skip empty/killed dirs)
+            # For running targets: most recent dir within the batch window
+            if in_cp:
+                for sd in reversed(scan_dirs):  # newest first
+                    if os.path.exists(os.path.join(sd, "summary.json")):
+                        scan_dir = sd
+                        break
+                if not scan_dir and scan_dirs:  # fallback to most recent even without summary
+                    scan_dir = scan_dirs[-1]
+            else:
+                for sd in scan_dirs:
+                    sd_mtime = os.path.getmtime(sd)
                     if sd_mtime >= ts_epoch - 60 and sd_mtime <= ts_epoch + 43200:
                         scan_dir = sd
 
