@@ -12,9 +12,25 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8888
 
 def find_active_batch():
-    """Return the most recently modified batch directory."""
-    dirs = sorted(glob.glob(os.path.join(BASE, "batch_*")), key=os.path.getmtime, reverse=True)
-    return dirs[0] if dirs else None
+    """Return the most relevant batch directory.
+    Prefers incomplete batches (in-progress) over complete ones.
+    Sorts by directory name timestamp (not mtime) to avoid being
+    fooled by files written into old batch dirs."""
+    import re as _re
+    def batch_ts(d):
+        m = _re.search(r"batch_(\d{8}_\d{6})", d)
+        return m.group(1) if m else ""
+    all_dirs = sorted(glob.glob(os.path.join(BASE, "batch_*")), key=batch_ts, reverse=True)
+    # Prefer most recent incomplete batch (actively running)
+    for d in all_dirs:
+        if os.path.exists(os.path.join(d, "checkpoint.json")) and \
+           not os.path.exists(os.path.join(d, "batch_complete")):
+            return d
+    # Fall back to most recent complete batch
+    for d in all_dirs:
+        if os.path.exists(os.path.join(d, "batch_complete")):
+            return d
+    return all_dirs[0] if all_dirs else None
 
 def get_all_batches():
     """Return all completed batch runs sorted newest-first, with summary data."""
@@ -186,12 +202,21 @@ def reconstruct_status(batch_dir):
                 status = "complete"
         else:
             if complete:
-                # Batch finished but this target isn't in checkpoint = did not complete
                 status = "not_run"
             elif scan_dir:
-                import time as _time
-                age = _time.time() - os.path.getmtime(scan_dir)
-                status = "running" if age < 1800 else "queued"
+                import re as _re2, datetime as _dt
+                # Use the timestamp in the dir name — not mtime which changes when
+                # files are regenerated (e.g. regen-all-reports.py)
+                m = _re2.search(r"(\d{8}_\d{6})$", os.path.basename(scan_dir))
+                if m:
+                    try:
+                        scan_start = _dt.datetime.strptime(m.group(1), "%Y%m%d_%H%M%S")
+                        age_min = (_dt.datetime.now() - scan_start).total_seconds() / 60
+                        status = "running" if age_min < 90 else "queued"
+                    except Exception:
+                        status = "queued"
+                else:
+                    status = "queued"
                 if status == "running":
                     running_idx = i
             else:
