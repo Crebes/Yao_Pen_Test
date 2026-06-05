@@ -5,7 +5,7 @@ Serves the dashboard UI and proxies status/log data from the active batch run.
 Usage: python3 dashboard.py [port]   (default port 8888)
 """
 import json, os, glob, sys, re
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -1551,9 +1551,8 @@ class Handler(BaseHTTPRequestHandler):
             script = os.path.join(BASE, "batch-run.sh")
             try:
                 body_data = {}
-                cl = int(self.headers.get("Content-Length", 0))
-                if cl:
-                    try: body_data = _json.loads(self.rfile.read(cl))
+                if body:
+                    try: body_data = _json.loads(body)
                     except Exception: pass
                 parallel = str(int(body_data.get("parallel", 4)))
                 env = os.environ.copy()
@@ -1567,13 +1566,13 @@ class Handler(BaseHTTPRequestHandler):
                         os.kill(old_pid, 0)  # raises if process doesn't exist
                     except (ValueError, ProcessLookupError, OSError):
                         os.remove(lock_file)  # stale lock — remove it
-                subprocess.Popen(
+                proc = subprocess.Popen(
                     ["bash", script],
-                    stdout=open("/tmp/batch-master.log","w"),
+                    stdout=open("/tmp/batch-master.log", "w"),
                     stderr=subprocess.STDOUT,
-                    start_new_session=True,
+                    close_fds=True,
                     env=env)
-                self.send_json({"ok": True, "message": f"Batch scan launched ({parallel} parallel). Switch to the Scan Progress tab."})
+                self.send_json({"ok": True, "message": f"Batch scan launched ({parallel} parallel — PID {proc.pid}). Switch to Scan Progress tab."})
             except Exception as e:
                 self.send_json({"ok": False, "message": f"Failed to launch: {e}"})
 
@@ -1659,7 +1658,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(404); self.end_headers()
 
 if __name__ == "__main__":
-    server = HTTPServer(("0.0.0.0", PORT), Handler)
+    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"\n  Yao Pentest Dashboard")
     print(f"  Open: http://localhost:{PORT}")
     print(f"  Ctrl+C to stop\n")
