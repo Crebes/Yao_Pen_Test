@@ -1002,7 +1002,7 @@ async function headerStartScan() {
 
 async function stopScan() {
   const stopBtn = document.getElementById("stop-btn");
-  const msg = document.getElementById("stop-msg");
+  const msg     = document.getElementById("stop-msg");
   if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = "Stopping..."; }
   try {
     const res  = await fetch("/stop-batch", {method:"POST"});
@@ -1011,9 +1011,9 @@ async function stopScan() {
     const banner = document.getElementById("stop-banner");
     if (banner) banner.style.display = "none";
   } catch(e) {
-    if (msg) { msg.style.display = "block"; msg.textContent = "Error: " + e.message; }
+    if (msg) { msg.style.display = "block"; msg.textContent = "Error stopping: " + e.message; }
   } finally {
-    if (stopBtn) { stopBtn.textContent = "⏹ Stop Scan"; }
+    if (stopBtn) { stopBtn.disabled = false; stopBtn.textContent = "⏹ Stop"; }
   }
 }
 

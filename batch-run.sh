@@ -8,6 +8,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGETS_JSON="$SCRIPT_DIR/targets.json"
 MAX_PARALLEL="${MAX_PARALLEL:-4}"
 
+# Ensure DNS is always set correctly (survives WSL restarts)
+if grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "nameserver 8.8.8.8" > /etc/resolv.conf
+    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+fi
+
 # ── Single-instance lock — prevent two batches running at once ─
 GLOBAL_LOCK="$SCRIPT_DIR/.batch.lock"
 # Clear stale lock if the PID that wrote it is no longer running
