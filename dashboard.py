@@ -164,10 +164,14 @@ def reconstruct_status(batch_dir):
         host = url.replace("https://","").replace("http://","")
         safe = re.sub(r"[^a-zA-Z0-9_.-]", "_", host)
 
-        # Find most recent scan dir for this target
-        scan_dirs = sorted(glob.glob(os.path.join(BASE, f"pentest_{safe}_*")),
-                           key=os.path.getmtime, reverse=True)
-        scan_dir  = scan_dirs[0] if scan_dirs else None
+        # Find most recent scan dir WITH a summary.json for this target
+        # (skip empty dirs from killed scans)
+        all_scan_dirs = sorted(glob.glob(os.path.join(BASE, f"pentest_{safe}_*")),
+                               key=os.path.getmtime, reverse=True)
+        scan_dir = next(
+            (d for d in all_scan_dirs if os.path.exists(os.path.join(d, "summary.json"))),
+            all_scan_dirs[0] if all_scan_dirs else None
+        )
 
         # Determine status
         if url in checkpoint:
