@@ -94,11 +94,11 @@ run_target() {
 
     local START_TS; START_TS=$(date +%s)
 
-    # Pass login-path as a CLI arg to avoid stdin consumption issues.
-    # Stdin only needed for JWT token (always empty = skip).
-    printf "\n" | \
-        python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--${MODE}" --yes \
+    # All interactive prompts are handled via CLI args or batch-mode defaults.
+    # Redirect stdin from /dev/null so any remaining input() raises EOF cleanly.
+    python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--${MODE}" --yes \
         --login-path "$LOGIN_PATH" \
+        < /dev/null \
         > "$TARGET_LOG" 2>&1
     local EXIT=$?
 
