@@ -83,6 +83,39 @@ JWTEOF
 chmod +x /usr/local/bin/jwt_tool
 ok "jwt_tool installed → $(which jwt_tool)"
 
+# ── Nuclei ────────────────────────────────────────────────
+info "Installing/updating nuclei..."
+go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest 2>&1 | tail -3
+cp ~/go/bin/nuclei /usr/local/bin/nuclei 2>/dev/null || true
+nuclei -update-templates -silent 2>/dev/null || true
+ok "nuclei → $(which nuclei 2>/dev/null || echo installed)"
+
+# ── wafw00f ────────────────────────────────────────────────
+info "Installing/updating wafw00f..."
+pip3 install wafw00f --break-system-packages -q 2>/dev/null || pip3 install wafw00f -q 2>/dev/null || true
+ok "wafw00f → $(which wafw00f 2>/dev/null || echo installed)"
+
+# ── checkdmarc ─────────────────────────────────────────────
+info "Installing/updating checkdmarc..."
+pip3 install checkdmarc --break-system-packages -q 2>/dev/null || pip3 install checkdmarc -q 2>/dev/null || true
+ok "checkdmarc → $(which checkdmarc 2>/dev/null || echo installed)"
+
+# ── SecretFinder ───────────────────────────────────────────
+info "Installing/updating SecretFinder..."
+if [[ -d /opt/SecretFinder/.git ]]; then
+    git -C /opt/SecretFinder pull --ff-only 2>&1 | tail -2
+else
+    git clone --depth 1 https://github.com/m4ll0k/SecretFinder /opt/SecretFinder 2>&1 | tail -2
+fi
+pip3 install jsbeautifier requests --break-system-packages -q 2>/dev/null || \
+    pip3 install jsbeautifier requests -q 2>/dev/null || true
+cat > /usr/local/bin/secretfinder << 'SFEOF'
+#!/usr/bin/env bash
+exec python3 /opt/SecretFinder/SecretFinder.py "$@"
+SFEOF
+chmod +x /usr/local/bin/secretfinder
+ok "secretfinder → $(which secretfinder)"
+
 # ── DNS fix (WSL only) ────────────────────────────────────
 if grep -qi microsoft /proc/version 2>/dev/null; then
     info "WSL detected — ensuring DNS is set..."
@@ -136,7 +169,7 @@ fi
 echo ""
 echo -e "${CYAN}=== Tool check ===${RESET}"
 ALL_OK=true
-for tool in nmap nikto hydra ffuf testssl.sh jwt_tool; do
+for tool in nmap nikto hydra ffuf testssl.sh jwt_tool nuclei wafw00f checkdmarc secretfinder; do
     path=$(command -v "$tool" 2>/dev/null || true)
     if [[ -n "$path" ]]; then
         ok "$tool → $path"
