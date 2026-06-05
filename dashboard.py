@@ -67,11 +67,18 @@ def get_all_batches():
                 key=os.path.getmtime
             )
             scan_dir = None
+            in_cp = url in cp
             for sd in scan_dirs:
                 sd_mtime = os.path.getmtime(sd)
-                # Must be newer than batch dir creation, within 12h
-                if sd_mtime >= ts_epoch - 60 and sd_mtime <= ts_epoch + 43200:
-                    scan_dir = sd
+                if in_cp:
+                    # For completed targets accept any scan dir up to 24h before batch end
+                    batch_end = ts_epoch + 86400
+                    if sd_mtime <= batch_end:
+                        scan_dir = sd  # take the most recent valid one (list is sorted asc)
+                else:
+                    # For non-completed targets only look within the batch window
+                    if sd_mtime >= ts_epoch - 60 and sd_mtime <= ts_epoch + 43200:
+                        scan_dir = sd
 
             counts = {"CRITICAL":0,"HIGH":0,"MEDIUM":0,"LOW":0,"INFO":0}
             g = None
