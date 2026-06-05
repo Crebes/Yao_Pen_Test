@@ -1,82 +1,82 @@
 {
   "targets": [
     {
-      "url": "https://app.stg.yao.legal",
-      "mode": "staging",
+      "url":        "https://app.stg.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Main SaaS app \u2014 staging"
+      "notes":      "Main SaaS app — staging"
     },
     {
-      "url": "https://backoffice.staging.yao.legal",
-      "mode": "staging",
+      "url":        "https://backoffice.staging.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Backoffice admin panel \u2014 staging"
+      "notes":      "Backoffice admin panel — staging"
     },
     {
-      "url": "https://wopi.stg.yao.legal",
-      "mode": "staging",
+      "url":        "https://wopi.stg.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "WOPI document service \u2014 staging"
+      "notes":      "WOPI document service — staging (was 503 at time of last scan)"
     },
     {
-      "url": "https://app.staging.yao.legal",
-      "mode": "staging",
+      "url":        "https://app.staging.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Main SaaS app \u2014 staging alias"
+      "notes":      "Main SaaS app — staging alias"
     },
     {
-      "url": "https://app.yao.legal",
-      "mode": "staging",
+      "url":        "https://app.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Main SaaS app \u2014 PRODUCTION (Hydra enabled \u2014 pete@ may be locked out)"
+      "notes":      "Main SaaS app — PRODUCTION (Hydra enabled — pete@ may be locked out)"
     },
     {
-      "url": "https://backoffice.yao.legal",
-      "mode": "staging",
+      "url":        "https://backoffice.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Backoffice admin panel \u2014 PRODUCTION (Hydra enabled \u2014 pete@ may be locked out)"
+      "notes":      "Backoffice admin panel — PRODUCTION (Hydra enabled — pete@ may be locked out)"
     },
     {
-      "url": "https://uk.yao.legal",
-      "mode": "staging",
+      "url":        "https://uk.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "UK regional endpoint \u2014 PRODUCTION (Hydra enabled \u2014 pete@ may be locked out)"
+      "notes":      "UK regional endpoint — PRODUCTION (Hydra enabled — pete@ may be locked out)"
     },
     {
-      "url": "https://aus.yao.legal",
-      "mode": "staging",
+      "url":        "https://aus.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Australia regional endpoint \u2014 PRODUCTION (Hydra enabled \u2014 pete@ may be locked out)"
+      "notes":      "Australia regional endpoint — PRODUCTION (Hydra enabled — pete@ may be locked out)"
     },
     {
-      "url": "https://api.staging.yao.legal",
-      "mode": "staging",
-      "login_path": "/auth/login",
-      "notes": "Auto-discovered \u2014 HTTP 404  (REVIEW login_path)"
+      "url":        "https://api.staging.yao.legal",
+      "mode":       "staging",
+      "login_path": "/api/auth/login",
+      "notes":      "REST API — staging"
     },
     {
-      "url": "https://api.stg.yao.legal",
-      "mode": "staging",
-      "login_path": "/auth/login",
-      "notes": "Auto-discovered \u2014 HTTP 404  (REVIEW login_path)"
+      "url":        "https://api.stg.yao.legal",
+      "mode":       "staging",
+      "login_path": "/api/auth/login",
+      "notes":      "REST API — staging alias"
     },
     {
-      "url": "https://api.yao.legal",
-      "mode": "staging",
-      "login_path": "/auth/login",
-      "notes": "Auto-discovered \u2014 HTTP 404  (REVIEW login_path)"
+      "url":        "https://api.yao.legal",
+      "mode":       "staging",
+      "login_path": "/api/auth/login",
+      "notes":      "REST API — PRODUCTION (Hydra enabled — pete@ may be locked out)"
     },
     {
-      "url": "https://demo.yao.legal",
-      "mode": "staging",
+      "url":        "https://demo.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Auto-discovered \u2014 HTTP 200 AmazonS3"
+      "notes":      "Demo environment"
     },
     {
-      "url": "https://wopi.yao.legal",
-      "mode": "staging",
+      "url":        "https://wopi.yao.legal",
+      "mode":       "staging",
       "login_path": "/auth/login",
-      "notes": "Auto-discovered \u2014 HTTP 400 "
+      "notes":      "WOPI document service — PRODUCTION"
     }
   ]
 }
