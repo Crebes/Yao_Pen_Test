@@ -932,7 +932,7 @@ function renderCard(t) {
     case "queued":      badge=`<span class="badge badge-queued">QUEUED</span>`; break;
     default:            badge=`<span class="badge badge-skipped">&#10003; SKIPPED</span>`; break;
   }
-  const modeBadge = `<span class="badge badge-mode-${t.mode}">${t.mode.toUpperCase()}</span>`;
+  const modeBadge = `<span style="background:#1F4E79;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.72em;font-weight:700;">FULL SCAN</span>`;
 
   let body = `<div class="url">${t.url}</div>`;
 
@@ -1080,7 +1080,7 @@ def generate_export_report(batch_dir_override=None):
         c    = t.get("counts",{})
         nc   = c.get("CRITICAL",0); nh = c.get("HIGH",0)
         nm   = c.get("MEDIUM",0);   nl = c.get("LOW",0)
-        mc   = "#b45309" if mode=="staging" else "#1a7a4a"
+        mc   = "#1F4E79"
 
         if st == "offline":
             grade_cell = "<span style='background:#8e44ad;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em;font-weight:700;'>OFFLINE</span>"
@@ -1093,9 +1093,12 @@ def generate_export_report(batch_dir_override=None):
             grade_cell = f"<span style='background:{gc};color:#fff;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;font-size:0.85em;'>{g}</span>"
             def cv(n,sev): return f"<span style='color:{SEV_COLOR[sev]};font-weight:700;'>{n}</span>" if n else "0"
             counts_cell = f"CRIT:{cv(nc,'CRITICAL')} &nbsp; HIGH:{cv(nh,'HIGH')} &nbsp; MED:{cv(nm,'MEDIUM')} &nbsp; LOW:{cv(nl,'LOW')}"
-        else:
+        elif st in ("running",):
             grade_cell = "<span style='color:#3498db;'>SCANNING...</span>"
             counts_cell = "—"
+        else:
+            grade_cell = "<span style='color:#888;'>NOT RUN</span>"
+            counts_cell = "<span style='color:#555;font-size:0.85em;'>Scan did not complete</span>"
 
         summary_rows += f"""<tr>
           <td style='padding:10px 14px;font-weight:600;word-break:break-all;'>{_esc(url)}</td>

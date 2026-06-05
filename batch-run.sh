@@ -94,9 +94,11 @@ run_target() {
 
     local START_TS; START_TS=$(date +%s)
 
-    # Run wizard — stdin provides Hydra prompts
-    printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
+    # Pass login-path as a CLI arg to avoid stdin consumption issues.
+    # Stdin only needed for JWT token (always empty = skip).
+    printf "\n" | \
         python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--${MODE}" --yes \
+        --login-path "$LOGIN_PATH" \
         > "$TARGET_LOG" 2>&1
     local EXIT=$?
 
