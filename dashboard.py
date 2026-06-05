@@ -173,6 +173,23 @@ def reconstruct_status(batch_dir):
             pass
 
     complete = os.path.exists(os.path.join(batch_dir, "batch_complete"))
+
+    # Parse batch.log to find URLs that have been STARTed but not yet completed
+    # These are the actively running targets right now
+    actively_started = set()
+    batch_log = os.path.join(batch_dir, "batch.log")
+    if os.path.exists(batch_log):
+        try:
+            for line in open(batch_log, errors="replace"):
+                m_start = re.search(r"START\s+\[\d+/\d+\]\s+(https?://\S+)", line)
+                m_done  = re.search(r"(DONE|SKIP|OFFLINE|UNREACHABLE|ERROR|STOPPED)\s+\[\d+/\d+\].*?(https?://\S+)", line)
+                if m_start:
+                    actively_started.add(m_start.group(1).strip())
+                if m_done:
+                    actively_started.discard(m_done.group(2).strip())
+        except Exception:
+            pass
+
     target_states = []
     running_idx = None
 
@@ -204,22 +221,10 @@ def reconstruct_status(batch_dir):
         else:
             if complete:
                 status = "not_run"
-            elif scan_dir:
-                import re as _re2, datetime as _dt
-                # Use the timestamp in the dir name — not mtime which changes when
-                # files are regenerated (e.g. regen-all-reports.py)
-                m = _re2.search(r"(\d{8}_\d{6})$", os.path.basename(scan_dir))
-                if m:
-                    try:
-                        scan_start = _dt.datetime.strptime(m.group(1), "%Y%m%d_%H%M%S")
-                        age_min = (_dt.datetime.now() - scan_start).total_seconds() / 60
-                        status = "running" if age_min < 90 else "queued"
-                    except Exception:
-                        status = "queued"
-                else:
-                    status = "queued"
-                if status == "running":
-                    running_idx = i
+            elif url in actively_started:
+                # Confirmed running from batch.log START entries
+                status = "running"
+                running_idx = i
             else:
                 status = "queued"
 
