@@ -380,16 +380,22 @@ HTML = r"""<!DOCTYPE html>
     <div class="sub" id="batch-dir">Loading...</div>
     <div class="tick" id="last-tick">Connecting...</div>
   </div>
-  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:10px;">
+  <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
     <div style="text-align:right;">
       <div style="font-size:1.8em;font-weight:800;color:#2ecc71;" id="done-count">—</div>
       <div style="font-size:0.72em;color:#64a6d6;" id="done-label">of — targets</div>
     </div>
-    <a href="/export" download
-       style="background:#2980b9;color:#fff;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:7px;white-space:nowrap;"
-       title="Download full HTML report with all findings and parameters">
-      &#x2B07; Export Report
-    </a>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+      <button id="stop-btn" onclick="stopScan()"
+        style="background:#555;color:#aaa;border:none;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;cursor:not-allowed;white-space:nowrap;"
+        disabled title="No scan running">
+        &#x23F9; Stop Scan
+      </button>
+      <a href="/export" download
+         style="background:#2980b9;color:#fff;padding:9px 18px;border-radius:8px;font-size:0.82em;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:7px;white-space:nowrap;">
+        &#x2B07; Export Report
+      </a>
+    </div>
   </div>
 </div>
 
@@ -964,23 +970,19 @@ async function loadHistory() {
 }
 
 async function stopScan() {
-  const btn = event.target;
+  const stopBtn = document.getElementById("stop-btn");
   const msg = document.getElementById("stop-msg");
-  btn.disabled = true;
-  btn.textContent = "Stopping...";
+  if (stopBtn) { stopBtn.disabled = true; stopBtn.textContent = "Stopping..."; }
   try {
     const res  = await fetch("/stop-batch", {method:"POST"});
     const data = await res.json();
-    msg.style.display = "block";
-    msg.textContent = data.message;
-    document.getElementById("stop-banner").style.display = "none";
-    btn.disabled = false;
-    btn.textContent = "⏹ Stop Scan";
+    if (msg) { msg.style.display = "block"; msg.textContent = "✓ " + data.message; }
+    const banner = document.getElementById("stop-banner");
+    if (banner) banner.style.display = "none";
   } catch(e) {
-    msg.style.display = "block";
-    msg.textContent = "Error: " + e.message;
-    btn.disabled = false;
-    btn.textContent = "⏹ Stop Scan";
+    if (msg) { msg.style.display = "block"; msg.textContent = "Error: " + e.message; }
+  } finally {
+    if (stopBtn) { stopBtn.textContent = "⏹ Stop Scan"; }
   }
 }
 
@@ -1128,14 +1130,27 @@ async function refresh() {
     document.getElementById("complete-banner").style.display  = (status.complete && hasTargets) ? "block" : "none";
     document.getElementById("no-scan-banner").style.display   = (!hasTargets || (!isRunning && !status.complete)) ? "block" : "none";
     if (isRunning || status.complete) document.getElementById("no-scan-banner").style.display = "none";
-    // Stop button — show when running, hide when idle or complete
-    const stopBanner = document.getElementById("stop-banner");
+    // Stop button — active (red) when scanning, greyed when idle
+    const stopBtn = document.getElementById("stop-btn");
     if (isRunning && !status.complete) {
-      stopBanner.style.display = "flex";
-      document.getElementById("stop-running-label").textContent =
-        status.current_url ? `scanning ${status.current_url}` : `${status.done}/${status.total} targets done`;
+      stopBtn.disabled = false;
+      stopBtn.style.background = "#c0392b";
+      stopBtn.style.color = "#fff";
+      stopBtn.style.cursor = "pointer";
+      stopBtn.title = "Stop the running scan";
+      // Also show the inline banner
+      const stopBanner = document.getElementById("stop-banner");
+      if (stopBanner) { stopBanner.style.display = "flex"; }
+      const lbl = document.getElementById("stop-running-label");
+      if (lbl) lbl.textContent = status.current_url ? `scanning ${status.current_url}` : `${status.done}/${status.total} done`;
     } else {
-      stopBanner.style.display = "none";
+      stopBtn.disabled = true;
+      stopBtn.style.background = "#555";
+      stopBtn.style.color = "#aaa";
+      stopBtn.style.cursor = "not-allowed";
+      stopBtn.title = "No scan running";
+      const stopBanner = document.getElementById("stop-banner");
+      if (stopBanner) stopBanner.style.display = "none";
     }
 
     // Target grid
