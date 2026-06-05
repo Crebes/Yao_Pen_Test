@@ -12,17 +12,20 @@ for t in targets:
 
     counts = {'CRITICAL': 0, 'HIGH': 0, 'MEDIUM': 0, 'LOW': 0, 'INFO': 0}
     unreachable = False
+    offline = False
     if scan_dir and os.path.exists(f'{scan_dir}/nmap.txt'):
         nmap_txt = open(f'{scan_dir}/nmap.txt').read()
         if 'Failed to resolve' in nmap_txt or '0 hosts up' in nmap_txt:
             unreachable = True
+        elif '503' in nmap_txt and 'Service' in nmap_txt:
+            offline = True
     if scan_dir and os.path.exists(f'{scan_dir}/summary.json'):
         s = json.load(open(f'{scan_dir}/summary.json'))
         counts = s.get('findings_by_severity', counts)
 
     results.append({
         'url': t['url'], 'mode': t['mode'], 'notes': t.get('notes',''),
-        'scan_dir': scan_dir, 'host': host, 'unreachable': unreachable,
+        'scan_dir': scan_dir, 'host': host, 'unreachable': unreachable, 'offline': offline,
         'critical': counts['CRITICAL'], 'high': counts['HIGH'],
         'medium': counts['MEDIUM'], 'low': counts['LOW'], 'info': counts['INFO'],
     })
@@ -56,6 +59,11 @@ for r in results:
         ch = hh = mh = lh = "<span style='color:#aaa;'>—</span>"
         row_style = "background:#f8f8f8;"
         action = "<span style='color:#e67e22;font-weight:600;font-size:0.82em;'>&#x26A0; Verify URL / check DNS</span>"
+    elif r['offline']:
+        grade_cell = "<span style='background:#8e44ad;color:#fff;padding:2px 10px;border-radius:10px;font-size:0.75em;font-weight:700;'>OFFLINE</span>"
+        ch = hh = mh = lh = "<span style='color:#aaa;'>—</span>"
+        row_style = "background:#fdf6ff;"
+        action = "<span style='color:#8e44ad;font-weight:600;font-size:0.82em;'>&#x1F534; HTTP 503 — service is down</span>"
     else:
         g, gc = grade(r)
         grade_cell = f"<span style='background:{gc};color:#fff;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;font-weight:800;font-size:0.9em;'>{g}</span>"
