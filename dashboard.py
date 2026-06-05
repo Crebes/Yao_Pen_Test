@@ -560,7 +560,7 @@ HTML = r"""<!DOCTYPE html>
           <div style="margin-top:6px;color:#4a7a9b;font-size:0.85em;">
             Checks for: HTTP 429, Retry-After header, progressive slowdown, response body change
           </div></td>
-          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#b45309;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">STAGING</span></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1F4E79;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">FULL SCAN</span></td>
         </tr>
         <tr style="border-top:1px solid #1e3a5f;background:#111e2b;">
           <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">5b</td>
@@ -574,7 +574,7 @@ HTML = r"""<!DOCTYPE html>
             <b>-t 4</b> 4 threads &nbsp;·&nbsp; <b>https-post-form</b> TLS-aware form POST &nbsp;·&nbsp;
             <b>F=Invalid</b> failure string &nbsp;·&nbsp; 27 Yao usernames × wordlist passwords
           </div></td>
-          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#b45309;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">STAGING</span></td>
+          <td style="padding:10px 12px;white-space:nowrap;"><span style="background:#1F4E79;color:#fff;padding:1px 7px;border-radius:8px;font-size:0.75em;">FULL SCAN</span></td>
         </tr>
         <tr style="border-top:1px solid #1e3a5f;">
           <td style="padding:10px 12px;color:#64a6d6;font-weight:700;">6</td>
@@ -1150,7 +1150,7 @@ def generate_export_report(batch_dir_override=None):
 
         summary_rows += f"""<tr>
           <td style='padding:10px 14px;font-weight:600;word-break:break-all;'>{_esc(url)}</td>
-          <td style='padding:10px 14px;'><span style='background:{mc};color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em;font-weight:700;'>{mode.upper()}</span></td>
+          <td style='padding:10px 14px;'><span style='background:#1F4E79;color:#fff;padding:2px 8px;border-radius:10px;font-size:0.75em;font-weight:700;'>FULL SCAN</span></td>
           <td style='padding:10px 14px;text-align:center;'>{grade_cell}</td>
           <td style='padding:10px 14px;font-size:0.88em;'>{counts_cell}</td>
         </tr>"""
@@ -1215,8 +1215,8 @@ def generate_export_report(batch_dir_override=None):
         ("2","nikto","Web server misconfiguration & headers","nikto -h <url> -ssl -port 443 -output nikto.txt -Format txt -maxtime 300","ALL"),
         ("3","testssl.sh","TLS/SSL — protocols, ciphers, BREACH, HSTS","testssl.sh --jsonfile testssl.json <host>:<port>","ALL"),
         ("4","ffuf","Hidden endpoint discovery","ffuf -u <url>/FUZZ -w wordlist.txt -mc 200,201,204,301,302,403,404 -ic -ac -t 40 -fs <baseline>","ALL"),
-        ("5a","Rate-limit check","15 rapid POSTs to detect throttling","POST <url><login_path> ×15  body: username=dummy&password=wrong  interval: 100ms","STAGING"),
-        ("5b","hydra","Credential brute-force","hydra -L usernames.txt -P passwords.txt -s <port> <host> https-post-form \"<path>:user=^USER^&pass=^PASS^:F=Invalid\" -t 4","STAGING"),
+        ("5a","Rate-limit check","15 rapid POSTs to detect throttling","POST <url><login_path> ×15  body: username=dummy&password=wrong  interval: 100ms","ALL"),
+        ("5b","hydra","Credential brute-force","hydra -L usernames.txt -P passwords.txt -s <port> <host> https-post-form \"<path>:user=^USER^&pass=^PASS^:F=Invalid\" -t 4","ALL"),
         ("6","jwt_tool","JWT token analysis","jwt_tool <token> -t","ALL"),
         ("7","nuclei","CVE & misconfiguration scanner","nuclei -u <url> -t cves,exposures,misconfiguration,default-logins,technologies -json -rate-limit 10 -timeout 10","ALL"),
         ("8","wafw00f","WAF/CDN detection","wafw00f <url> -a -o wafw00f.txt","ALL"),
