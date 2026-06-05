@@ -37,11 +37,17 @@ def reconstruct_status(batch_dir):
     except Exception:
         return {"error": "Could not load targets.json"}
 
-    checkpoint = []
+    checkpoint = {}
     cp_file = os.path.join(batch_dir, "checkpoint.json")
     if os.path.exists(cp_file):
         try:
-            checkpoint = json.load(open(cp_file)).get("completed", [])
+            data = json.load(open(cp_file))
+            completed = data.get("completed", {})
+            # Support both old list format and new dict format
+            if isinstance(completed, list):
+                checkpoint = {url: {"status":"complete"} for url in completed}
+            else:
+                checkpoint = completed
         except Exception:
             pass
 
@@ -61,20 +67,24 @@ def reconstruct_status(batch_dir):
 
         # Determine status
         if url in checkpoint:
-            nmap_txt = os.path.join(scan_dir, "nmap.txt") if scan_dir else None
-            if nmap_txt and os.path.exists(nmap_txt):
-                txt = open(nmap_txt).read()
-                if "503" in txt:
-                    status = "offline"
-                elif "Failed to resolve" in txt or "0 hosts up" in txt:
-                    status = "unreachable"
-                else:
-                    status = "complete"
+            cp_status = checkpoint[url].get("status","") if isinstance(checkpoint.get(url),dict) else ""
+            if cp_status == "OFFLINE" or (scan_dir and "503" in open(os.path.join(scan_dir,"nmap.txt")).read() if scan_dir and os.path.exists(os.path.join(scan_dir,"nmap.txt")) else False):
+                status = "offline"
+            elif cp_status == "UNREACHABLE":
+                status = "unreachable"
             else:
                 status = "complete"
         else:
-            status = "running" if not complete else "queued"
-            if status == "running" and running_idx is None:
+            # In parallel mode, multiple targets can be running at once
+            # A target is "running" if it has a recent scan dir being modified
+            if scan_dir and not complete:
+                import time as _time
+                mtime = os.path.getmtime(scan_dir)
+                age   = _time.time() - mtime
+                status = "running" if age < 1800 else "queued"  # active in last 30 min
+            else:
+                status = "queued" if not complete else "queued"
+            if status == "running":
                 running_idx = i
 
         # Read findings from summary.json

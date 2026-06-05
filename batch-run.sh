@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
-# Batch runner — reads targets.json, runs pentest_wizard.py for each target.
-# Features:
-#   - Pre-checks each target for 503/DNS before running the full scan
-#   - Checkpoint file so the batch resumes after a WSL restart
-#   - All output tee'd to batch_TIMESTAMP/batch.log
+# Batch runner — parallel edition.
+# Runs up to MAX_PARALLEL targets concurrently.
+# Usage: MAX_PARALLEL=4 bash batch-run.sh   (default: 4)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGETS_JSON="$SCRIPT_DIR/targets.json"
+MAX_PARALLEL="${MAX_PARALLEL:-4}"
 
-# ── Checkpoint: resume an existing batch or start fresh ───
-# If a batch dir exists with an incomplete checkpoint, resume it.
-# Otherwise create a new one.
+# ── Checkpoint: resume or start fresh ─────────────────────
 RESUME_DIR=""
 for d in "$SCRIPT_DIR"/batch_*/; do
     if [[ -f "$d/checkpoint.json" && ! -f "$d/batch_complete" ]]; then
@@ -21,166 +18,178 @@ done
 
 if [[ -n "$RESUME_DIR" ]]; then
     BATCH_DIR="$RESUME_DIR"
-    echo "[$(date '+%H:%M:%S')] Resuming interrupted batch: $BATCH_DIR"
 else
-    TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-    BATCH_DIR="$SCRIPT_DIR/batch_$TIMESTAMP"
+    BATCH_DIR="$SCRIPT_DIR/batch_$(date +%Y%m%d_%H%M%S)"
     mkdir -p "$BATCH_DIR"
 fi
 
 LOG="$BATCH_DIR/batch.log"
 CHECKPOINT="$BATCH_DIR/checkpoint.json"
+LOCK="$BATCH_DIR/checkpoint.lock"
 
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$LOG"; }
 
-# Checkpoint helpers
+# Thread-safe checkpoint helpers (flock serialises concurrent writes)
 checkpoint_done() {
-    local url="$1"
-    python3 - "$CHECKPOINT" "$url" << 'PYEOF'
+    local url="$1" status="$2" dur="$3"
+    (flock 9
+     python3 - "$CHECKPOINT" "$url" "$status" "$dur" << 'PYEOF'
 import json, sys
-cp_file, url = sys.argv[1], sys.argv[2]
-try:    done = json.load(open(cp_file)).get("completed", [])
-except: done = []
-if url not in done:
-    done.append(url)
-json.dump({"completed": done}, open(cp_file, "w"), indent=2)
+f, url, status, dur = sys.argv[1:]
+try:    data = json.load(open(f))
+except: data = {"completed": {}}
+data.setdefault("completed", {})[url] = {"status": status, "duration": dur}
+json.dump(data, open(f, "w"), indent=2)
 PYEOF
+    ) 9>"$LOCK"
 }
 
 is_done() {
     local url="$1"
     python3 - "$CHECKPOINT" "$url" << 'PYEOF'
 import json, sys
-cp_file, url = sys.argv[1], sys.argv[2]
-try:    done = json.load(open(cp_file)).get("completed", [])
-except: done = []
+f, url = sys.argv[1:]
+try:    done = json.load(open(f)).get("completed", {})
+except: done = {}
 sys.exit(0 if url in done else 1)
 PYEOF
 }
 
-# Quick HTTP pre-check — returns status code or "DNS" / "TIMEOUT"
 http_precheck() {
     local url="$1"
-    local code
-    code=$(curl -s -o /dev/null -w "%{http_code}" \
+    curl -s -o /dev/null -w "%{http_code}" \
         --max-time 10 --connect-timeout 5 \
-        -H "User-Agent: PentestWizard/1.0 (authorised security test)" \
-        "$url" 2>/dev/null) || true
-    if [[ -z "$code" || "$code" == "000" ]]; then
-        # Try DNS resolution separately
-        local host
-        host=$(python3 -c "from urllib.parse import urlparse; print(urlparse('$url').hostname)")
-        if ! nslookup "$host" > /dev/null 2>&1; then
-            echo "DNS"; return
-        fi
-        echo "TIMEOUT"; return
-    fi
-    echo "$code"
+        -H "User-Agent: PentestWizard/1.0" \
+        "$url" 2>/dev/null || echo "000"
 }
 
+# ── Worker function (runs in background) ──────────────────
+run_target() {
+    local URL="$1" MODE="$2" LOGIN_PATH="$3" IDX="$4" TOTAL="$5"
+    local HOST; HOST=$(python3 -c "from urllib.parse import urlparse; print(urlparse('$URL').hostname)")
+    local SAFE; SAFE=$(echo "$HOST" | sed 's/[^a-zA-Z0-9._-]/_/g')
+    local TARGET_LOG="$BATCH_DIR/scan_${SAFE}.log"
+
+    log "  START [$IDX/$TOTAL] $URL"
+
+    # Pre-check
+    local CODE; CODE=$(http_precheck "$URL")
+    if [[ "$CODE" == "503" ]]; then
+        log "  OFFLINE [$IDX/$TOTAL] $URL (503)"
+        mkdir -p "$SCRIPT_DIR/pentest_${SAFE}_$(date +%Y%m%d_%H%M%S)"
+        local SCAN_DIR; SCAN_DIR=$(ls -dt "$SCRIPT_DIR/pentest_${SAFE}_"*/ 2>/dev/null | head -1)
+        echo "503 Service Temporarily Unavailable" > "$SCAN_DIR/nmap.txt"
+        echo '{"findings_by_severity":{"CRITICAL":0,"HIGH":0,"MEDIUM":0,"LOW":0,"INFO":1},"findings":[{"tool":"Pre-check","severity":"INFO","title":"Service offline — HTTP 503","detail":"Pre-flight check returned 503. Scan skipped.","recommendation":"Verify service is running.","steps":[],"refs":[]}]}' > "$SCAN_DIR/summary.json"
+        checkpoint_done "$URL" "OFFLINE" "0s"
+        return
+    fi
+    if [[ "$CODE" == "000" ]]; then
+        local HOST_ONLY; HOST_ONLY=$(python3 -c "from urllib.parse import urlparse; print(urlparse('$URL').hostname)")
+        if ! nslookup "$HOST_ONLY" > /dev/null 2>&1; then
+            log "  UNREACHABLE [$IDX/$TOTAL] $URL (DNS failed)"
+            checkpoint_done "$URL" "UNREACHABLE" "0s"
+            return
+        fi
+    fi
+
+    local START_TS; START_TS=$(date +%s)
+
+    # Run wizard — stdin provides Hydra prompts
+    printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
+        python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--${MODE}" --yes \
+        > "$TARGET_LOG" 2>&1
+    local EXIT=$?
+
+    local DURATION=$(( $(date +%s) - START_TS ))
+    local STATUS="OK"
+    [[ $EXIT -eq 2 ]] && STATUS="UNREACHABLE"
+    [[ $EXIT -ne 0 && $EXIT -ne 2 ]] && STATUS="ERROR($EXIT)"
+
+    # Append target log to master log
+    echo "" >> "$LOG"
+    echo "=== $URL ===" >> "$LOG"
+    cat "$TARGET_LOG" >> "$LOG" 2>/dev/null || true
+
+    # Read finding counts
+    local SCAN_DIR; SCAN_DIR=$(ls -dt "$SCRIPT_DIR/pentest_${SAFE}_"*/ 2>/dev/null | head -1)
+    local C=0 H=0 M=0 L=0
+    if [[ -n "$SCAN_DIR" && -f "$SCAN_DIR/summary.json" ]]; then
+        read -r C H M L <<< "$(python3 -c "
+import json; s=json.load(open('$SCAN_DIR/summary.json')); b=s['findings_by_severity']
+print(b.get('CRITICAL',0),b.get('HIGH',0),b.get('MEDIUM',0),b.get('LOW',0))" 2>/dev/null || echo '0 0 0 0')"
+    fi
+
+    checkpoint_done "$URL" "$STATUS" "${DURATION}s"
+    log "  DONE [$IDX/$TOTAL] $STATUS ${DURATION}s C:$C H:$H M:$M L:$L — $URL"
+}
+
+# ── Main ──────────────────────────────────────────────────
 log "======================================================"
-log " Yao Pentest Wizard — Batch Run"
+log " Yao Pentest Wizard — Parallel Batch (max $MAX_PARALLEL)"
 log " Started: $(date)"
 log " Batch dir: $BATCH_DIR"
 log "======================================================"
 
-# ── Step 0: Subdomain discovery (only on fresh start) ─────
+# Step 0: discovery (fresh runs only)
 if [[ -z "$RESUME_DIR" ]]; then
     log ""
     log "--- Step 0: Subdomain discovery ---"
     python3 "$SCRIPT_DIR/discover-subdomains.py" >> "$LOG" 2>&1
-    if [[ -f "$SCRIPT_DIR/subdomain_discovery.json" ]]; then
-        python3 "$SCRIPT_DIR/update-targets.py" >> "$LOG" 2>&1
+    [[ -f "$SCRIPT_DIR/subdomain_discovery.json" ]] && \
+        python3 "$SCRIPT_DIR/update-targets.py" >> "$LOG" 2>&1 && \
         log "Targets updated from discovery"
-    fi
 else
     log "--- Resuming — skipping discovery ---"
 fi
 
-# ── Parse targets ──────────────────────────────────────────
+# Parse targets
 TARGETS=$(python3 -c "
 import json
-data = json.load(open('$TARGETS_JSON'))
-for t in data['targets']:
-    print(t['url'] + '|' + t['mode'] + '|' + t['login_path'])
+for t in json.load(open('$TARGETS_JSON'))['targets']:
+    print(t['url']+'|'+t['mode']+'|'+t['login_path'])
 ")
 TOTAL=$(echo "$TARGETS" | wc -l)
 IDX=0
 
+log ""
+log "Running $TOTAL targets with MAX_PARALLEL=$MAX_PARALLEL"
+log ""
+
+# Launch workers with concurrency cap
 while IFS='|' read -r URL MODE LOGIN_PATH; do
     IDX=$((IDX + 1))
 
-    # ── Skip if already completed in a previous run ────────
     if is_done "$URL"; then
-        log "[$IDX/$TOTAL] SKIPPED (already completed) — $URL"
+        log "  SKIP [$IDX/$TOTAL] already completed — $URL"
         continue
     fi
 
-    log ""
-    log "------------------------------------------------------"
-    log "[$IDX/$TOTAL] $URL ($MODE)"
-    log "------------------------------------------------------"
+    # Wait until a worker slot is free
+    while [[ $(jobs -rp | wc -l) -ge $MAX_PARALLEL ]]; do
+        sleep 3
+    done
 
-    # ── Pre-check: 503 / DNS before running full scan ──────
-    log "  Pre-check: testing $URL..."
-    PRECHECK=$(http_precheck "$URL")
-    log "  Pre-check result: HTTP $PRECHECK"
-
-    if [[ "$PRECHECK" == "503" ]]; then
-        log "  OFFLINE (503) — service is down. Skipping full scan."
-        mkdir -p "$SCRIPT_DIR/pentest_$(echo "$URL" | sed 's|https\?://||' | sed 's|/.*||')_$(date +%Y%m%d_%H%M%S)"
-        SCAN_DIR=$(ls -dt "$SCRIPT_DIR"/pentest_*/ 2>/dev/null | head -1)
-        # Write a minimal nmap.txt so build-index.py detects OFFLINE
-        echo "503 Service Temporarily Unavailable — pre-check confirmed offline" > "$SCAN_DIR/nmap.txt"
-        echo '{"findings_by_severity":{"CRITICAL":0,"HIGH":0,"MEDIUM":0,"LOW":0,"INFO":1},"findings":[{"tool":"Pre-check","severity":"INFO","title":"Service offline — HTTP 503","detail":"Pre-flight HTTP check returned 503. No scan performed.","recommendation":"Verify the service is running before re-scanning.","steps":[],"refs":[]}]}' > "$SCAN_DIR/summary.json"
-        checkpoint_done "$URL"
-        log "[$IDX/$TOTAL] OFFLINE in 0s — $SCAN_DIR"
-        continue
-    fi
-
-    if [[ "$PRECHECK" == "DNS" ]]; then
-        log "  UNREACHABLE (DNS failed) — skipping."
-        checkpoint_done "$URL"
-        log "[$IDX/$TOTAL] UNREACHABLE — $URL"
-        continue
-    fi
-
-    if [[ "$PRECHECK" == "TIMEOUT" ]]; then
-        log "  TIMEOUT on pre-check — will attempt scan anyway."
-    fi
-
-    # ── Run the wizard ─────────────────────────────────────
-    START_TS=$(date +%s)
-    printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
-        python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--$MODE" --yes \
-        >> "$LOG" 2>&1
-    EXIT=$?
-    DURATION=$(( $(date +%s) - START_TS ))
-
-    if [[ $EXIT -eq 2 ]]; then   STATUS="UNREACHABLE"
-    elif [[ $EXIT -eq 0 ]]; then STATUS="OK"
-    else                          STATUS="ERROR ($EXIT)"
-    fi
-
-    SCAN_DIR=$(ls -dt "$SCRIPT_DIR"/pentest_*/ 2>/dev/null | head -1)
-
-    C=0; H=0; M=0; L=0
-    if [[ -f "$SCAN_DIR/summary.json" ]]; then
-        read -r C H M L <<< "$(python3 -c "
-import json; s=json.load(open('$SCAN_DIR/summary.json')); b=s['findings_by_severity']
-print(b.get('CRITICAL',0),b.get('HIGH',0),b.get('MEDIUM',0),b.get('LOW',0))")"
-    fi
-
-    checkpoint_done "$URL"
-    log "[$IDX/$TOTAL] $STATUS in ${DURATION}s — C:$C H:$H M:$M L:$L → $SCAN_DIR"
+    run_target "$URL" "$MODE" "$LOGIN_PATH" "$IDX" "$TOTAL" &
 
 done <<< "$TARGETS"
 
-# ── Mark batch complete ────────────────────────────────────
+# Wait for all workers to finish
+log ""
+log "All targets launched — waiting for workers to complete..."
+wait
+
+# Mark complete
 touch "$BATCH_DIR/batch_complete"
+DONE=$(python3 -c "
+import json
+try:
+    d=json.load(open('$CHECKPOINT')).get('completed',{})
+    print(len(d))
+except: print(0)" 2>/dev/null || echo 0)
+
 log ""
 log "======================================================"
-log " Batch complete: $TOTAL targets processed"
+log " Batch complete: $DONE/$TOTAL targets finished"
 log " Batch dir: $BATCH_DIR"
 log "======================================================"
 echo "BATCH_COMPLETE:$BATCH_DIR"
