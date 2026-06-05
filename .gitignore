@@ -16,6 +16,9 @@ regen.py
 # Tool update timestamp
 .last_update
 
+# Email credentials — never commit
+email-config.json
+
 # Password wordlists (may contain sensitive data)
 *.txt
 !yao_ffuf_wordlist.txt

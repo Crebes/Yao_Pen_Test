@@ -1,0 +1,9 @@
+{
+  "smtp_host":  "smtp.gmail.com",
+  "smtp_port":  587,
+  "username":   "your-gmail@gmail.com",
+  "password":   "your-16-char-app-password",
+  "from":       "your-gmail@gmail.com",
+  "to":         ["pete@yaotechnology.com", "col@yaotechnology.com"],
+  "subject":    "Yao Security Scan — {date}"
+}
