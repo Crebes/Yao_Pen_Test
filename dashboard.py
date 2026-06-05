@@ -710,6 +710,13 @@ async function refresh() {
 
     if (status.error) {
       document.getElementById("prog-label").textContent = status.error;
+      document.getElementById("no-scan-banner").style.display = "block";
+      document.getElementById("complete-banner").style.display = "none";
+      document.getElementById("current-scan").style.display   = "none";
+      document.getElementById("prog-fill").style.width = "0%";
+      document.getElementById("done-count").textContent = "—";
+      document.getElementById("done-label").textContent = "";
+      document.getElementById("grid").innerHTML = "";
       return;
     }
 
