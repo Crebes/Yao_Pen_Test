@@ -95,10 +95,13 @@ info "Installing/updating wafw00f..."
 pip3 install wafw00f --break-system-packages -q 2>/dev/null || pip3 install wafw00f -q 2>/dev/null || true
 ok "wafw00f → $(which wafw00f 2>/dev/null || echo installed)"
 
-# ── checkdmarc ─────────────────────────────────────────────
+# ── checkdmarc (venv to avoid system pip conflicts) ────────
 info "Installing/updating checkdmarc..."
-pip3 install checkdmarc --break-system-packages -q 2>/dev/null || pip3 install checkdmarc -q 2>/dev/null || true
-ok "checkdmarc → $(which checkdmarc 2>/dev/null || echo installed)"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3.12-venv 2>&1 | tail -1
+python3 -m venv /opt/checkdmarc-venv
+/opt/checkdmarc-venv/bin/pip install checkdmarc -q 2>&1 | tail -2
+ln -sf /opt/checkdmarc-venv/bin/checkdmarc /usr/local/bin/checkdmarc
+ok "checkdmarc → $(which checkdmarc)"
 
 # ── SecretFinder ───────────────────────────────────────────
 info "Installing/updating SecretFinder..."
