@@ -392,9 +392,22 @@ HTML = r"""<!DOCTYPE html>
     <div style="font-size:2em;margin-bottom:10px;">&#x1F6E1;</div>
     <div style="font-size:1.2em;font-weight:700;color:#fff;margin-bottom:6px;">No scan running</div>
     <div style="color:#64a6d6;font-size:0.88em;margin-bottom:20px;">Start a new batch scan against all targets in targets.json</div>
-    <button onclick="startBatchFromProgress()" class="btn btn-success" style="font-size:1em;padding:12px 32px;">
-      &#x25B6; Start Batch Scan
-    </button>
+    <div style="display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:0.82em;color:#64a6d6;font-weight:600;">Parallel targets:</label>
+        <select id="parallel-count-main" style="background:#0f2030;border:1px solid #2980b9;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:0.88em;">
+          <option value="1">1 (slow, low load)</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4" selected>4 (recommended)</option>
+          <option value="6">6 (fast, high load)</option>
+          <option value="13">All at once</option>
+        </select>
+      </div>
+      <button onclick="startBatchFromProgress()" class="btn btn-success" style="font-size:1em;padding:12px 32px;">
+        &#x25B6; Start Batch Scan
+      </button>
+    </div>
     <div id="start-scan-msg" style="margin-top:12px;font-size:0.82em;color:#64a6d6;"></div>
   </div>
 
@@ -680,7 +693,20 @@ HTML = r"""<!DOCTYPE html>
     <h3>&#x1F680; Run a New Batch Scan</h3>
     <p>Starts a new full batch scan against all targets in targets.json.
        Discovery runs first to pick up any new subdomains.</p>
-    <button class="btn btn-primary" onclick="runBatch()">&#x25B6; Start Batch Scan</button>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <label style="font-size:0.82em;color:#8fb3c8;font-weight:600;">Parallel targets:</label>
+        <select id="parallel-count-setup" style="background:#0f2030;border:1px solid #1e3a5f;border-radius:6px;padding:6px 10px;color:#e2e8f0;font-size:0.88em;">
+          <option value="1">1 (slow, low load)</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4" selected>4 (recommended)</option>
+          <option value="6">6 (fast, high load)</option>
+          <option value="13">All at once</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="runBatch()">&#x25B6; Start Batch Scan</button>
+    </div>
     <div id="batch-launch-msg" style="margin-top:10px;font-size:0.82em;color:#64a6d6;"></div>
   </div>
 
@@ -755,8 +781,11 @@ async function runInstall() {
 
 async function runBatch() {
   const msg = document.getElementById("batch-launch-msg");
+  const parallel = document.getElementById("parallel-count-setup")?.value || "4";
   msg.textContent = "Launching batch scan...";
-  const res = await fetch("/run-batch", {method:"POST"});
+  const res = await fetch("/run-batch", {method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({parallel})});
   const data = await res.json();
   msg.textContent = data.message;
   if(data.ok) showTab("scan");
@@ -896,11 +925,14 @@ async function loadHistory() {
 async function startBatchFromProgress() {
   const msg = document.getElementById("start-scan-msg");
   const btn = event.target;
+  const parallel = document.getElementById("parallel-count-main")?.value || "4";
   btn.disabled = true;
   btn.textContent = "Launching...";
   msg.textContent = "Starting scan — this page will update automatically...";
   try {
-    const res  = await fetch("/run-batch", {method:"POST"});
+    const res  = await fetch("/run-batch", {method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({parallel})});
     const data = await res.json();
     if (data.ok) {
       msg.textContent = "Scan launched. Progress will appear below in a few seconds.";
@@ -1355,15 +1387,24 @@ class Handler(BaseHTTPRequestHandler):
                 pass
 
         elif path == "/run-batch":
-            import subprocess
+            import subprocess, json as _json
             script = os.path.join(BASE, "batch-run.sh")
             try:
+                body_data = {}
+                cl = int(self.headers.get("Content-Length", 0))
+                if cl:
+                    try: body_data = _json.loads(self.rfile.read(cl))
+                    except Exception: pass
+                parallel = str(int(body_data.get("parallel", 4)))
+                env = os.environ.copy()
+                env["MAX_PARALLEL"] = parallel
                 subprocess.Popen(
                     ["bash", script],
                     stdout=open("/tmp/batch-master.log","w"),
                     stderr=subprocess.STDOUT,
-                    start_new_session=True)
-                self.send_json({"ok": True, "message": "Batch scan launched. Switch to the Scan Progress tab."})
+                    start_new_session=True,
+                    env=env)
+                self.send_json({"ok": True, "message": f"Batch scan launched ({parallel} parallel). Switch to the Scan Progress tab."})
             except Exception as e:
                 self.send_json({"ok": False, "message": f"Failed to launch: {e}"})
 
