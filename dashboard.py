@@ -438,6 +438,13 @@ HTML = r"""<!DOCTYPE html>
     <div id="start-scan-msg" style="margin-top:12px;font-size:0.82em;color:#64a6d6;"></div>
   </div>
 
+  <!-- Stop button — visible only when running -->
+  <div id="stop-banner" style="display:none;background:#2c1515;border:1px solid #c0392b;border-radius:8px;padding:12px 20px;margin-bottom:16px;display:none;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div style="color:#e2e8f0;font-size:0.88em;">&#x1F534; Scan in progress — <span id="stop-running-label"></span></div>
+    <button onclick="stopScan()" style="background:#c0392b;color:#fff;border:none;padding:8px 20px;border-radius:7px;font-size:0.85em;font-weight:700;cursor:pointer;">&#x23F9; Stop Scan</button>
+  </div>
+  <div id="stop-msg" style="display:none;background:#1a2a3a;border:1px solid #e67e22;border-radius:8px;padding:12px 20px;margin-bottom:16px;color:#e67e22;font-size:0.88em;"></div>
+
   <!-- Complete -->
   <div id="complete-banner" style="display:none;" class="complete-banner">
     &#x2705; Batch scan complete — all targets processed. &nbsp;
@@ -716,6 +723,13 @@ HTML = r"""<!DOCTYPE html>
     <div class="install-log" id="install-log"></div>
   </div>
 
+  <div class="setup-card" style="border-left:4px solid #c0392b;">
+    <h3>&#x23F9; Stop Running Scan</h3>
+    <p>Gracefully stops the current batch scan, marks all in-progress targets as STOPPED, and releases the lock.</p>
+    <button class="btn btn-danger" onclick="stopScan()">&#x23F9; Stop Scan</button>
+    <div id="stop-msg-setup" style="margin-top:10px;font-size:0.82em;color:#e67e22;"></div>
+  </div>
+
   <div class="setup-card">
     <h3>&#x1F680; Run a New Batch Scan</h3>
     <p>Starts a new full batch scan against all targets in targets.json.
@@ -949,6 +963,27 @@ async function loadHistory() {
   document.getElementById("history-runs").innerHTML = runsHtml;
 }
 
+async function stopScan() {
+  const btn = event.target;
+  const msg = document.getElementById("stop-msg");
+  btn.disabled = true;
+  btn.textContent = "Stopping...";
+  try {
+    const res  = await fetch("/stop-batch", {method:"POST"});
+    const data = await res.json();
+    msg.style.display = "block";
+    msg.textContent = data.message;
+    document.getElementById("stop-banner").style.display = "none";
+    btn.disabled = false;
+    btn.textContent = "⏹ Stop Scan";
+  } catch(e) {
+    msg.style.display = "block";
+    msg.textContent = "Error: " + e.message;
+    btn.disabled = false;
+    btn.textContent = "⏹ Stop Scan";
+  }
+}
+
 async function startBatchFromProgress() {
   const msg = document.getElementById("start-scan-msg");
   const btn = event.target;
@@ -1093,6 +1128,15 @@ async function refresh() {
     document.getElementById("complete-banner").style.display  = (status.complete && hasTargets) ? "block" : "none";
     document.getElementById("no-scan-banner").style.display   = (!hasTargets || (!isRunning && !status.complete)) ? "block" : "none";
     if (isRunning || status.complete) document.getElementById("no-scan-banner").style.display = "none";
+    // Stop button — show when running, hide when idle or complete
+    const stopBanner = document.getElementById("stop-banner");
+    if (isRunning && !status.complete) {
+      stopBanner.style.display = "flex";
+      document.getElementById("stop-running-label").textContent =
+        status.current_url ? `scanning ${status.current_url}` : `${status.done}/${status.total} targets done`;
+    } else {
+      stopBanner.style.display = "none";
+    }
 
     // Target grid
     const grid = document.getElementById("grid");
@@ -1412,6 +1456,46 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(b"0\r\n\r\n")
             except Exception as e:
                 pass
+
+        elif path == "/stop-batch":
+            import subprocess, signal as _sig, json as _json
+            stopped = []
+            lock_file = os.path.join(BASE, ".batch.lock")
+            # Kill batch-run.sh via PID file
+            if os.path.exists(lock_file):
+                try:
+                    pid = int(open(lock_file).read().strip())
+                    os.killpg(os.getpgid(pid), _sig.SIGTERM)
+                    stopped.append(f"batch-run PID {pid}")
+                except Exception:
+                    pass
+                try: os.remove(lock_file)
+                except Exception: pass
+            # Kill any remaining scan tools
+            for pattern in ["pentest_wizard.py", "testssl.sh", "nmap --script", "hydra", "nuclei", "nikto", "ffuf", "corsy", "wafw00f"]:
+                try:
+                    subprocess.run(["pkill", "-9", "-f", pattern], capture_output=True)
+                except Exception:
+                    pass
+            # Mark current batch as stopped (so it shows as complete in dashboard)
+            batch_dir = find_active_batch()
+            if batch_dir and not os.path.exists(os.path.join(batch_dir, "batch_complete")):
+                # Write batch_complete with a STOPPED marker
+                open(os.path.join(batch_dir, "batch_complete"), "w").write("STOPPED")
+                # Update checkpoint: mark any un-checkpointed targets as STOPPED
+                cp_file = os.path.join(batch_dir, "checkpoint.json")
+                try:
+                    cp = _json.load(open(cp_file)) if os.path.exists(cp_file) else {"completed": {}}
+                    targets = _json.load(open(os.path.join(BASE, "targets.json")))["targets"]
+                    for t in targets:
+                        if t["url"] not in cp.get("completed", {}):
+                            cp.setdefault("completed", {})[t["url"]] = {"status": "STOPPED", "duration": "0s"}
+                    _json.dump(cp, open(cp_file, "w"), indent=2)
+                except Exception:
+                    pass
+                stopped.append(f"batch marked stopped: {os.path.basename(batch_dir)}")
+            msg = "Scan stopped. " + (", ".join(stopped) if stopped else "No active scan found.")
+            self.send_json({"ok": True, "message": msg})
 
         elif path == "/run-batch":
             import subprocess, json as _json
