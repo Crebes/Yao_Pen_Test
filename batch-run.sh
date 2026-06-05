@@ -56,11 +56,27 @@ PYEOF
 }
 
 http_precheck() {
-    local url="$1"
-    curl -s -o /dev/null -w "%{http_code}" \
+    local url="$1" login_path="${2:-/}"
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" \
         --max-time 10 --connect-timeout 5 \
         -H "User-Agent: PentestWizard/1.0" \
-        "$url" 2>/dev/null || echo "000"
+        "$url" 2>/dev/null) || code="000"
+    # If root returns 503, check the login_path before declaring offline —
+    # APIs often serve 503 at / but are live at /api or /api/auth/login
+    if [[ "$code" == "503" && "$login_path" != "/" ]]; then
+        local fallback_code
+        local fallback_url="${url%/}/${login_path#/}"
+        fallback_code=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 10 --connect-timeout 5 \
+            -H "User-Agent: PentestWizard/1.0" \
+            "$fallback_url" 2>/dev/null) || fallback_code="000"
+        if [[ "$fallback_code" != "503" && "$fallback_code" != "000" ]]; then
+            echo "$fallback_code"   # login path is live — not offline
+            return
+        fi
+    fi
+    echo "$code"
 }
 
 # ── Worker function (runs in background) ──────────────────
@@ -73,7 +89,7 @@ run_target() {
     log "  START [$IDX/$TOTAL] $URL"
 
     # Pre-check
-    local CODE; CODE=$(http_precheck "$URL")
+    local CODE; CODE=$(http_precheck "$URL" "$LOGIN_PATH")
     if [[ "$CODE" == "503" ]]; then
         log "  OFFLINE [$IDX/$TOTAL] $URL (503)"
         mkdir -p "$SCRIPT_DIR/pentest_${SAFE}_$(date +%Y%m%d_%H%M%S)"

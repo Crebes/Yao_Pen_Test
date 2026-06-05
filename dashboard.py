@@ -100,7 +100,7 @@ def get_all_batches():
 
             nmap_txt = os.path.join(scan_dir,"nmap.txt") if scan_dir else ""
             st = "complete"
-            if cp_status == "OFFLINE" or (nmap_txt and os.path.exists(nmap_txt) and "503" in open(nmap_txt).read()):
+            if cp_status == "OFFLINE" or (nmap_txt and os.path.exists(nmap_txt) and re.search(r"http-title.*503|503.*Service Temporarily Unavailable", open(nmap_txt).read(), re.IGNORECASE)):
                 st = "offline"
             elif cp_status == "UNREACHABLE":
                 st = "unreachable"
@@ -176,7 +176,9 @@ def reconstruct_status(batch_dir):
         # Determine status
         if url in checkpoint:
             cp_status = checkpoint[url].get("status","") if isinstance(checkpoint.get(url),dict) else ""
-            if cp_status == "OFFLINE" or (scan_dir and "503" in open(os.path.join(scan_dir,"nmap.txt")).read() if scan_dir and os.path.exists(os.path.join(scan_dir,"nmap.txt")) else False):
+            _nmap_f = os.path.join(scan_dir,"nmap.txt") if scan_dir else ""
+            _nmap_503 = bool(re.search(r"http-title.*503|503.*Service Temporarily Unavailable", open(_nmap_f).read(), re.IGNORECASE)) if _nmap_f and os.path.exists(_nmap_f) else False
+            if cp_status == "OFFLINE" or _nmap_503:
                 status = "offline"
             elif cp_status == "UNREACHABLE":
                 status = "unreachable"
