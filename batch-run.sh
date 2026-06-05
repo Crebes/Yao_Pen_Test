@@ -20,6 +20,17 @@ log " Targets JSON: $TARGETS_JSON"
 log " Output dir:   $BATCH_DIR"
 log "======================================================"
 
+# ── Step 0: Subdomain discovery + targets update ──────────
+log ""
+log "--- Step 0: Subdomain discovery ---"
+python3 "$SCRIPT_DIR/discover-subdomains.py" >> "$LOG" 2>&1
+if [[ -f "$SCRIPT_DIR/subdomain_discovery.json" ]]; then
+    python3 "$SCRIPT_DIR/update-targets.py" >> "$LOG" 2>&1
+    log "Targets updated from discovery results"
+else
+    log "Discovery produced no output — scanning existing targets only"
+fi
+
 # Parse targets.json with Python (available in WSL)
 TARGETS=$(python3 -c "
 import json, sys
