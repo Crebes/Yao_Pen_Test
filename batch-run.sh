@@ -10,11 +10,19 @@ MAX_PARALLEL="${MAX_PARALLEL:-4}"
 
 # ── Single-instance lock — prevent two batches running at once ─
 GLOBAL_LOCK="$SCRIPT_DIR/.batch.lock"
-exec 8>"$GLOBAL_LOCK"
-if ! flock -n 8; then
-    echo "Another batch scan is already running. Exiting."
+# Clear stale lock if the PID that wrote it is no longer running
+if [[ -f "$GLOBAL_LOCK" ]]; then
+    OLD_PID=$(cat "$GLOBAL_LOCK" 2>/dev/null)
+    if [[ -n "$OLD_PID" ]] && ! kill -0 "$OLD_PID" 2>/dev/null; then
+        rm -f "$GLOBAL_LOCK"
+    fi
+fi
+if [[ -f "$GLOBAL_LOCK" ]]; then
+    echo "Another batch scan is already running (PID $(cat "$GLOBAL_LOCK")). Exiting."
     exit 1
 fi
+echo $$ > "$GLOBAL_LOCK"
+trap "rm -f '$GLOBAL_LOCK'" EXIT
 
 # ── Checkpoint: resume or start fresh ─────────────────────
 RESUME_DIR=""

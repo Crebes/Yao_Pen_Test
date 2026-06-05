@@ -1425,6 +1425,15 @@ class Handler(BaseHTTPRequestHandler):
                 parallel = str(int(body_data.get("parallel", 4)))
                 env = os.environ.copy()
                 env["MAX_PARALLEL"] = parallel
+                # Clear any stale lock before launching
+                lock_file = os.path.join(BASE, ".batch.lock")
+                if os.path.exists(lock_file):
+                    try:
+                        old_pid = int(open(lock_file).read().strip())
+                        import signal
+                        os.kill(old_pid, 0)  # raises if process doesn't exist
+                    except (ValueError, ProcessLookupError, OSError):
+                        os.remove(lock_file)  # stale lock — remove it
                 subprocess.Popen(
                     ["bash", script],
                     stdout=open("/tmp/batch-master.log","w"),
