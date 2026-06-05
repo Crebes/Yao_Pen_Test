@@ -23,8 +23,12 @@ log "NOTE: pete@yaotechnology.com is in the username list — lockout accepted"
 for entry in "${TARGETS[@]}"; do
   IFS='|' read -r URL MODE LOGIN_PATH <<< "$entry"
   log "--- $URL ($MODE) ---"
-  if printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
-      python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--$MODE" --yes >> "$LOG" 2>&1; then
+  printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
+      python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "--$MODE" --yes >> "$LOG" 2>&1
+  EXIT=$?
+  if [[ $EXIT -eq 2 ]]; then
+    log "SKIPPED (DNS unreachable) — $URL"
+  elif [[ $EXIT -eq 0 ]]; then
     SCAN_DIR=$(ls -dt "$SCRIPT_DIR"/pentest_*/ 2>/dev/null | head -1)
     COUNTS=$(python3 -c "
 import json
@@ -34,7 +38,7 @@ print(b.get('CRITICAL',0), b.get('HIGH',0), b.get('MEDIUM',0), b.get('LOW',0))
 " 2>/dev/null || echo "? ? ? ?")
     log "OK — C/H/M/L: $COUNTS → $SCAN_DIR"
   else
-    log "ERROR scanning $URL"
+    log "ERROR (exit $EXIT) scanning $URL"
   fi
 done
 

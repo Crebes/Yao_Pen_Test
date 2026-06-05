@@ -43,9 +43,13 @@ while IFS='|' read -r URL MODE LOGIN_PATH; do
     MODE_FLAG="--$MODE"
 
     # Run the wizard — stdin provides interactive prompts
-    if printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
+    printf "${LOGIN_PATH}\n1\n/tmp/passwords.txt\n\n\n\n" | \
         python3 "$SCRIPT_DIR/pentest_wizard.py" "$URL" "$MODE_FLAG" --yes \
-        >> "$LOG" 2>&1; then
+        >> "$LOG" 2>&1
+    EXIT=$?
+    if [[ $EXIT -eq 2 ]]; then
+        STATUS="UNREACHABLE"
+    elif [[ $EXIT -eq 0 ]]; then
         STATUS="OK"
     else
         STATUS="ERROR"
