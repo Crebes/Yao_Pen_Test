@@ -178,8 +178,20 @@ log ""
 log "All targets launched — waiting for workers to complete..."
 wait
 
-# Mark complete
+# Mark complete and save a snapshot report
 touch "$BATCH_DIR/batch_complete"
+python3 - "$BATCH_DIR" << 'PYEOF' 2>/dev/null || true
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)) if '__file__' in dir() else '/mnt/c/Data/ClaudeProjects/PenTest/yao-pentest')
+batch_dir = sys.argv[1]
+script_dir = os.path.dirname(os.path.abspath(batch_dir))
+sys.path.insert(0, script_dir)
+# Minimal import to generate report
+exec(open(os.path.join(script_dir, 'dashboard.py')).read().split('class Handler')[0])
+html = generate_export_report(batch_dir)
+open(os.path.join(batch_dir, 'report.html'), 'w').write(html)
+print(f'Snapshot report saved: {batch_dir}/report.html')
+PYEOF
 DONE=$(python3 -c "
 import json
 try:

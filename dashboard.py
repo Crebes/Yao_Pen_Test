@@ -16,6 +16,100 @@ def find_active_batch():
     dirs = sorted(glob.glob(os.path.join(BASE, "batch_*")), key=os.path.getmtime, reverse=True)
     return dirs[0] if dirs else None
 
+def get_all_batches():
+    """Return all completed batch runs sorted newest-first, with summary data."""
+    import datetime as dt
+    batch_dirs = sorted(
+        glob.glob(os.path.join(BASE, "batch_*")),
+        key=os.path.getmtime, reverse=True
+    )
+    batches = []
+    for bd in batch_dirs:
+        complete = os.path.exists(os.path.join(bd, "batch_complete"))
+        ts_match = re.search(r"batch_(\d{8}_\d{6})", bd)
+        if not ts_match:
+            continue
+        ts_str = ts_match.group(1)
+        try:
+            run_dt = dt.datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+            run_label = run_dt.strftime("%d %b %Y, %H:%M")
+        except Exception:
+            run_label = ts_str
+
+        # Load checkpoint
+        cp = {}
+        cp_file = os.path.join(bd, "checkpoint.json")
+        if os.path.exists(cp_file):
+            try:
+                data = json.load(open(cp_file))
+                completed = data.get("completed", {})
+                cp = completed if isinstance(completed, dict) else {u: {"status":"complete"} for u in completed}
+            except Exception:
+                pass
+
+        # Gather per-target results from scan dirs
+        targets_data = []
+        try:
+            tgts = json.load(open(os.path.join(BASE, "targets.json")))["targets"]
+        except Exception:
+            tgts = []
+
+        total_c = total_h = total_m = total_l = 0
+        for t in tgts:
+            url  = t["url"]
+            host = url.replace("https://","").replace("http://","")
+            safe = re.sub(r"[^a-zA-Z0-9_.-]", "_", host)
+            # Find the scan dir created during this batch window
+            ts_epoch = os.path.getmtime(bd)
+            # Look for scan dirs within ±12h of batch start
+            scan_dirs = sorted(
+                glob.glob(os.path.join(BASE, f"pentest_{safe}_*")),
+                key=os.path.getmtime
+            )
+            scan_dir = None
+            for sd in scan_dirs:
+                sd_mtime = os.path.getmtime(sd)
+                # Must be newer than batch dir creation, within 12h
+                if sd_mtime >= ts_epoch - 60 and sd_mtime <= ts_epoch + 43200:
+                    scan_dir = sd
+
+            counts = {"CRITICAL":0,"HIGH":0,"MEDIUM":0,"LOW":0,"INFO":0}
+            g = None
+            cp_entry = cp.get(url, {})
+            cp_status = cp_entry.get("status","") if isinstance(cp_entry,dict) else ""
+
+            if scan_dir and os.path.exists(os.path.join(scan_dir,"summary.json")):
+                try:
+                    s = json.load(open(os.path.join(scan_dir,"summary.json")))
+                    counts = s.get("findings_by_severity", counts)
+                    nc,nh,nm = counts.get("CRITICAL",0),counts.get("HIGH",0),counts.get("MEDIUM",0)
+                    total_c+=nc; total_h+=nh; total_m+=nm; total_l+=counts.get("LOW",0)
+                    g,_ = grade(nc,nh,nm)
+                except Exception:
+                    pass
+
+            nmap_txt = os.path.join(scan_dir,"nmap.txt") if scan_dir else ""
+            st = "complete"
+            if cp_status == "OFFLINE" or (nmap_txt and os.path.exists(nmap_txt) and "503" in open(nmap_txt).read()):
+                st = "offline"
+            elif cp_status == "UNREACHABLE":
+                st = "unreachable"
+            elif url not in cp:
+                st = "not_run"
+
+            targets_data.append({"url":url,"status":st,"grade":g,"counts":counts})
+
+        batches.append({
+            "batch_dir":  bd,
+            "run_label":  run_label,
+            "ts":         ts_str,
+            "complete":   complete,
+            "targets":    targets_data,
+            "totals":     {"CRITICAL":total_c,"HIGH":total_h,"MEDIUM":total_m,"LOW":total_l},
+            "scanned":    sum(1 for t in targets_data if t["status"] in ("complete","offline","unreachable")),
+        })
+    return batches
+
 def get_status():
     batch_dir = find_active_batch()
     if not batch_dir:
@@ -260,6 +354,7 @@ HTML = r"""<!DOCTYPE html>
 
 <div class="tabs">
   <div class="tab active" onclick="showTab('scan')">&#x1F4CA; Scan Progress</div>
+  <div class="tab" onclick="showTab('history'); loadHistory()">&#x1F4C5; History</div>
   <div class="tab" onclick="showTab('tools')">&#x1F527; Tools &amp; Parameters</div>
   <div class="tab" onclick="showTab('setup')">&#x2699;&#xFE0F; Setup</div>
 </div>
@@ -305,6 +400,39 @@ HTML = r"""<!DOCTYPE html>
 </div>
 
 </div><!-- end tab-scan -->
+
+<div id="tab-history" class="tab-content">
+<div style="padding:20px 32px;max-width:1200px;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+    <div>
+      <div style="font-size:1.1em;font-weight:700;color:#fff;">Scan History</div>
+      <div style="font-size:0.82em;color:#64a6d6;margin-top:2px;">All completed batch runs — track security posture over time</div>
+    </div>
+    <button class="btn btn-primary" onclick="loadHistory()" style="font-size:0.82em;padding:8px 16px;">&#x21BB; Refresh</button>
+  </div>
+
+  <div id="history-loading" style="color:#64a6d6;font-size:0.88em;padding:20px 0;">Loading history...</div>
+
+  <!-- Grade trend table (populated by JS) -->
+  <div id="grade-trend" style="display:none;margin-bottom:20px;">
+    <div class="setup-card">
+      <h3>&#x1F4C8; Grade Trend — All Targets</h3>
+      <p style="color:#8fb3c8;font-size:0.85em;margin-bottom:14px;">Each column is a scan run. Green = improving, red = regressing.</p>
+      <div style="overflow-x:auto;">
+        <table id="trend-table" style="border-collapse:collapse;font-size:0.82em;min-width:600px;">
+          <thead id="trend-head"></thead>
+          <tbody id="trend-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Per-run cards -->
+  <div id="history-runs"></div>
+
+</div>
+</div><!-- end tab-history -->
 
 <div id="tab-tools" class="tab-content">
 <div class="setup-con" style="max-width:1060px;">
@@ -620,6 +748,137 @@ async function runBatch() {
   if(data.ok) showTab("scan");
 }
 
+async function loadHistory() {
+  document.getElementById("history-loading").style.display = "block";
+  document.getElementById("grade-trend").style.display     = "none";
+  document.getElementById("history-runs").innerHTML        = "";
+
+  const res     = await fetch("/history");
+  const batches = await res.json();
+  document.getElementById("history-loading").style.display = "none";
+
+  if (!batches.length) {
+    document.getElementById("history-runs").innerHTML =
+      "<div style='color:#64a6d6;padding:20px 0;'>No completed scans yet.</div>";
+    return;
+  }
+
+  // ── Grade trend table ─────────────────────────────────────
+  const allUrls = [...new Set(batches.flatMap(b => b.targets.map(t => t.url)))];
+  const completed = batches.filter(b => b.complete);
+
+  if (completed.length > 1) {
+    document.getElementById("grade-trend").style.display = "block";
+
+    // Header row: target | run1 | run2 | ...
+    let headHtml = "<tr><th style='padding:8px 12px;background:#1a2a3a;text-align:left;color:#64a6d6;font-size:0.78em;text-transform:uppercase;position:sticky;left:0;z-index:1;'>Target</th>";
+    completed.forEach(b => {
+      headHtml += `<th style='padding:8px 12px;background:#1a2a3a;color:#64a6d6;font-size:0.75em;text-align:center;white-space:nowrap;'>${b.run_label}</th>`;
+    });
+    headHtml += "</tr>";
+    document.getElementById("trend-head").innerHTML = headHtml;
+
+    // Body: one row per URL
+    let bodyHtml = "";
+    allUrls.forEach(url => {
+      const host = url.replace(/https?:\/\//,"");
+      bodyHtml += `<tr><td style='padding:7px 12px;font-size:0.82em;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#1a2a3a;border-right:1px solid #1e3a5f;'>${host}</td>`;
+      let prevGrade = null;
+      completed.forEach(b => {
+        const t = b.targets.find(t => t.url === url);
+        const g = t ? t.grade : null;
+        const st= t ? t.status : "not_run";
+        let cell = "";
+        if (st === "offline")     cell = `<span style='color:#8e44ad;font-size:0.78em;'>OFFLINE</span>`;
+        else if (st === "unreachable") cell = `<span style='color:#555;font-size:0.78em;'>—</span>`;
+        else if (st === "not_run") cell = `<span style='color:#333;font-size:0.78em;'>—</span>`;
+        else if (g) {
+          const gc = GRADE_COLORS[g] || "#555";
+          // trend arrow
+          let arrow = "";
+          if (prevGrade && prevGrade !== g) {
+            const gradeOrder = {"A":0,"B+":1,"B":2,"C":3,"D":4,"F":5};
+            const prev = gradeOrder[prevGrade]||99, cur = gradeOrder[g]||99;
+            arrow = cur < prev ? " &#x2191;" : cur > prev ? " &#x2193;" : "";
+            const arrowColor = cur < prev ? "#2ecc71" : "#e74c3c";
+            arrow = `<span style='color:${arrowColor};font-size:0.9em;'>${arrow}</span>`;
+          }
+          cell = `<span style='background:${gc};color:#fff;padding:2px 8px;border-radius:8px;font-weight:800;font-size:0.85em;'>${g}</span>${arrow}`;
+          prevGrade = g;
+        } else {
+          cell = `<span style='color:#555;font-size:0.78em;'>—</span>`;
+        }
+        bodyHtml += `<td style='padding:7px 12px;text-align:center;border-bottom:1px solid #1e3a5f;'>${cell}</td>`;
+      });
+      bodyHtml += "</tr>";
+    });
+    document.getElementById("trend-body").innerHTML = bodyHtml;
+  }
+
+  // ── Per-run summary cards ─────────────────────────────────
+  let runsHtml = "";
+  batches.forEach((b,idx) => {
+    const statusBadge = b.complete
+      ? `<span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75em;font-weight:700;'>COMPLETE</span>`
+      : `<span style='background:#3498db;color:#fff;padding:2px 8px;border-radius:8px;font-size:0.75em;font-weight:700;'>IN PROGRESS</span>`;
+
+    const t = b.totals;
+    const hasCrit = t.CRITICAL > 0, hasHigh = t.HIGH > 0;
+    function tot(n,sev) { return n > 0 ? `<span style='color:${SEV_COLORS[sev]};font-weight:700;'>${n}</span>` : n; }
+
+    // Target rows
+    let targetRows = "";
+    b.targets.forEach(tgt => {
+      if (tgt.status === "not_run") return;
+      const host = tgt.url.replace(/https?:\/\//,"");
+      const g = tgt.grade;
+      const gc = g ? (GRADE_COLORS[g]||"#555") : "#555";
+      const gradeCell = g
+        ? `<span style='background:${gc};color:#fff;padding:1px 7px;border-radius:6px;font-weight:800;font-size:0.8em;'>${g}</span>`
+        : (tgt.status==="offline"?"<span style='color:#8e44ad;font-size:0.78em;'>OFFLINE</span>":"<span style='color:#555;font-size:0.78em;'>—</span>");
+      const c = tgt.counts;
+      targetRows += `<tr style='border-top:1px solid #e8ecf0;'>
+        <td style='padding:6px 12px;font-size:0.82em;word-break:break-all;'>${host}</td>
+        <td style='padding:6px 12px;text-align:center;'>${gradeCell}</td>
+        <td style='padding:6px 12px;font-size:0.82em;text-align:center;color:#c0392b;font-weight:${c.CRITICAL?700:400};'>${c.CRITICAL||0}</td>
+        <td style='padding:6px 12px;font-size:0.82em;text-align:center;color:#e67e22;font-weight:${c.HIGH?700:400};'>${c.HIGH||0}</td>
+        <td style='padding:6px 12px;font-size:0.82em;text-align:center;color:#d4a017;'>${c.MEDIUM||0}</td>
+        <td style='padding:6px 12px;font-size:0.82em;text-align:center;color:#888;'>${c.LOW||0}</td>
+      </tr>`;
+    });
+
+    runsHtml += `
+    <div class="setup-card" style="margin-bottom:16px;${idx===0?'border-color:#3498db;':'' }">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+        <div>
+          <div style="font-size:1em;font-weight:700;color:#fff;">&#x1F4C5; ${b.run_label} ${idx===0?'<span style="font-size:0.72em;color:#64a6d6;">(most recent)</span>':''}</div>
+          <div style="font-size:0.78em;color:#64a6d6;margin-top:2px;">${b.scanned} of ${b.targets.length} targets scanned &nbsp;·&nbsp; ${statusBadge}</div>
+        </div>
+        <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+          <div style="text-align:center;"><div style="font-size:1.4em;font-weight:800;color:#c0392b;">${t.CRITICAL}</div><div style="font-size:0.68em;font-weight:700;color:#c0392b;text-transform:uppercase;">Critical</div></div>
+          <div style="text-align:center;"><div style="font-size:1.4em;font-weight:800;color:#e67e22;">${t.HIGH}</div><div style="font-size:0.68em;font-weight:700;color:#e67e22;text-transform:uppercase;">High</div></div>
+          <div style="text-align:center;"><div style="font-size:1.4em;font-weight:800;color:#d4a017;">${t.MEDIUM}</div><div style="font-size:0.68em;font-weight:700;color:#d4a017;text-transform:uppercase;">Medium</div></div>
+          <div style="text-align:center;"><div style="font-size:1.4em;font-weight:800;color:#27ae60;">${t.LOW}</div><div style="font-size:0.68em;font-weight:700;color:#27ae60;text-transform:uppercase;">Low</div></div>
+          ${b.complete ? `<a href="/export?batch=${encodeURIComponent(b.batch_dir)}" download style="background:#2980b9;color:#fff;padding:7px 14px;border-radius:7px;font-size:0.8em;font-weight:700;text-decoration:none;">&#x2B07; Export</a>` : ''}
+        </div>
+      </div>
+      ${targetRows ? `<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:#0f2030;">
+          <th style="padding:7px 12px;text-align:left;color:#64a6d6;font-size:0.75em;text-transform:uppercase;">Target</th>
+          <th style="padding:7px 12px;text-align:center;color:#64a6d6;font-size:0.75em;">Grade</th>
+          <th style="padding:7px 12px;text-align:center;color:#c0392b;font-size:0.75em;">CRIT</th>
+          <th style="padding:7px 12px;text-align:center;color:#e67e22;font-size:0.75em;">HIGH</th>
+          <th style="padding:7px 12px;text-align:center;color:#d4a017;font-size:0.75em;">MED</th>
+          <th style="padding:7px 12px;text-align:center;color:#888;font-size:0.75em;">LOW</th>
+        </tr></thead>
+        <tbody>${targetRows}</tbody>
+      </table></div>` : '<div style="color:#555;font-size:0.82em;">No scan data yet.</div>'}
+    </div>`;
+  });
+
+  document.getElementById("history-runs").innerHTML = runsHtml;
+}
+
 async function startBatchFromProgress() {
   const msg = document.getElementById("start-scan-msg");
   const btn = event.target;
@@ -804,10 +1063,10 @@ def grade(nc, nh, nm):
     if risk>0: return ("B+","#2ecc71")
     return ("A","#27ae60")
 
-def generate_export_report():
+def generate_export_report(batch_dir_override=None):
     """Build a full HTML report across all batch scan targets."""
     import datetime as dt
-    status = get_status()
+    status = get_status() if not batch_dir_override else reconstruct_status(batch_dir_override)
     if "error" in status:
         return f"<html><body>{status['error']}</body></html>"
 
@@ -1137,9 +1396,14 @@ class Handler(BaseHTTPRequestHandler):
             result = {t: shutil.which(t) or "" for t in tools}
             self.send_json(result)
 
+        elif path == "/history":
+            self.send_json(get_all_batches())
+
         elif path == "/export":
             import datetime as dt
-            html = generate_export_report()
+            qs = parse_qs(parsed.query)
+            batch_override = qs.get("batch",[""])[0]
+            html = generate_export_report(batch_override or None)
             fname = f"yao-pentest-report-{dt.datetime.now().strftime('%Y%m%d-%H%M')}.html"
             body  = html.encode("utf-8", errors="replace")
             self.send_response(200)
