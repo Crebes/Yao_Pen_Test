@@ -21,9 +21,10 @@ def find_active_batch():
         m = _re.search(r"batch_(\d{8}_\d{6})", d)
         return m.group(1) if m else ""
     all_dirs = sorted(glob.glob(os.path.join(BASE, "batch_*")), key=batch_ts, reverse=True)
-    # Prefer most recent incomplete batch (actively running)
+    # Prefer most recent incomplete batch (actively running or in discovery)
+    # A batch is in-progress if it has batch.log but NOT batch_complete
     for d in all_dirs:
-        if os.path.exists(os.path.join(d, "checkpoint.json")) and \
+        if os.path.exists(os.path.join(d, "batch.log")) and \
            not os.path.exists(os.path.join(d, "batch_complete")):
             return d
     # Fall back to most recent complete batch
