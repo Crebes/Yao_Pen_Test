@@ -25,7 +25,10 @@ def generate_report():
     """Generate the HTML export report from the latest batch."""
     sys.path.insert(0, BASE)
     try:
+        _saved_argv = sys.argv[:]
+        sys.argv = [sys.argv[0]]   # clear args so dashboard.py port parsing doesn't fail
         import dashboard as db
+        sys.argv = _saved_argv
         batch_dir = find_latest_batch()
         if not batch_dir:
             print("No completed batch found to email.")
@@ -131,8 +134,39 @@ def send_email(config, html, batch_dir, log_file):
         part.add_header("Content-Disposition", f'attachment; filename="{fname}"')
         msg.attach(part)
 
-    # Connect and send
-    host = config.get("smtp_host", "smtp.gmail.com")
+    recipients = config["to"] if isinstance(config["to"], list) else [config["to"]]
+
+    # SendGrid API (preferred — works even when SMTP AUTH is disabled)
+    if config.get("sendgrid_api_key"):
+        import urllib.request as _ur, json as _j
+        api_key = config["sendgrid_api_key"]
+        payload = {
+            "personalizations": [{"to": [{"email": r} for r in recipients]}],
+            "from": {"email": config["from"]},
+            "subject": subject,
+            "content": [{"type": "text/plain", "value": summary_text}],
+        }
+        if html:
+            fname = f"yao-pentest-{datetime.datetime.now().strftime('%Y%m%d')}.html"
+            import base64
+            payload["attachments"] = [{
+                "content": base64.b64encode(html.encode("utf-8")).decode(),
+                "type": "text/html",
+                "filename": fname,
+                "disposition": "attachment",
+            }]
+        data = _j.dumps(payload).encode()
+        req = _ur.Request("https://api.sendgrid.com/v3/mail/send",
+            data=data,
+            headers={"Authorization": f"Bearer {api_key}",
+                     "Content-Type": "application/json"},
+            method="POST")
+        resp = _ur.urlopen(req, timeout=30)
+        print(f"Report sent via SendGrid to: {', '.join(recipients)}")
+        return
+
+    # Standard SMTP fallback
+    host = config.get("smtp_host", "smtp.office365.com")
     port = int(config.get("smtp_port", 587))
     user = config["username"]
     pwd  = config["password"]
@@ -143,7 +177,6 @@ def send_email(config, html, batch_dir, log_file):
         if port == 587:
             server.starttls()
         server.login(user, pwd)
-        recipients = config["to"] if isinstance(config["to"], list) else [config["to"]]
         server.sendmail(config["from"], recipients, msg.as_string())
     print(f"Report emailed to: {', '.join(recipients)}")
 

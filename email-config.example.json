@@ -1,9 +1,13 @@
 {
-  "smtp_host":  "smtp.gmail.com",
-  "smtp_port":  587,
-  "username":   "your-gmail@gmail.com",
-  "password":   "your-16-char-app-password",
-  "from":       "your-gmail@gmail.com",
-  "to":         ["pete@yaotechnology.com", "col@yaotechnology.com"],
-  "subject":    "Yao Security Scan — {date}"
+  "_comment": "Option A — SendGrid (recommended, free 100/day, no SMTP AUTH needed)",
+  "sendgrid_api_key": "SG.your-sendgrid-api-key-here",
+  "from":    "pete@yaotechnology.com",
+  "to":      ["pete@yaotechnology.com", "col@yaotechnology.com"],
+  "subject": "Yao Security Scan — {date}",
+
+  "_comment2": "Option B — Direct SMTP (requires SMTP AUTH enabled on your tenant)",
+  "smtp_host": "smtp.office365.com",
+  "smtp_port": 587,
+  "username":  "pete@yaotechnology.com",
+  "password":  "your-password-here"
 }
