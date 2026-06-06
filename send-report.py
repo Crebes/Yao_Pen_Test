@@ -147,22 +147,25 @@ def send_email(config, html, batch_dir, log_file):
             "content": [{"type": "text/plain", "value": summary_text}],
         }
         if html:
-            fname = f"yao-pentest-{datetime.datetime.now().strftime('%Y%m%d')}.html"
-            import base64
-            payload["attachments"] = [{
-                "content": base64.b64encode(html.encode("utf-8")).decode(),
+            # Send as inline HTML body (avoids SendGrid attachment restrictions)
+            # Also add a stripped-down version as a second content part
+            payload["content"].append({
                 "type": "text/html",
-                "filename": fname,
-                "disposition": "attachment",
-            }]
+                "value": html
+            })
         data = _j.dumps(payload).encode()
         req = _ur.Request("https://api.sendgrid.com/v3/mail/send",
             data=data,
             headers={"Authorization": f"Bearer {api_key}",
                      "Content-Type": "application/json"},
             method="POST")
-        resp = _ur.urlopen(req, timeout=30)
-        print(f"Report sent via SendGrid to: {', '.join(recipients)}")
+        import urllib.error as _ue
+        try:
+            resp = _ur.urlopen(req, timeout=30)
+            print(f"Report sent via SendGrid to: {', '.join(recipients)}")
+        except _ue.HTTPError as e:
+            body = e.read().decode(errors="replace")
+            raise Exception(f"SendGrid {e.code}: {body}")
         return
 
     # Standard SMTP fallback
