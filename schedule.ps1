@@ -102,9 +102,9 @@ try {
 }
 
 Write-Host ""
-Write-Host "  To run immediately:  Start-ScheduledTask -TaskName '$TaskName'" -ForegroundColor Cyan
+Write-Host "  To run immediately:  Start-ScheduledTask -TaskName $TaskName" -ForegroundColor Cyan
 Write-Host "  To remove:           .\schedule.ps1 -Remove" -ForegroundColor Cyan
-Write-Host "  To change schedule:  .\schedule.ps1 -DayOfWeek Friday -Time '03:00'" -ForegroundColor Cyan
+Write-Host "  To change schedule:  .\schedule.ps1 -DayOfWeek Friday -Time 03:00" -ForegroundColor Cyan
 Write-Host ""
 
 # Offer to run now for a test
