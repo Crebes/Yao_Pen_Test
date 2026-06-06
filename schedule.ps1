@@ -84,17 +84,26 @@ $principal = New-ScheduledTaskPrincipal `
 
 # Register
 try {
+    # Remove old task first (ignore error if it doesn't exist)
     Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -ErrorAction SilentlyContinue
-    Register-ScheduledTask `
+    Start-Sleep -Seconds 1
+
+    $task = Register-ScheduledTask `
         -TaskName  $TaskName `
         -Action    $action `
         -Trigger   $trigger `
         -Settings  $settings `
         -Principal $principal `
-        -Description "Weekly Yao security scan - updates tools, scans all targets, emails report"
-    Write-Ok "Task created: $TaskName"
-    Write-Ok "Runs every $DayOfWeek at $Time"
-    Write-Ok "Script: $wslScript"
+        -Description "Weekly Yao security scan - updates tools, scans all targets, emails report" `
+        -Force
+
+    # Read back and confirm what was actually saved
+    $saved = Get-ScheduledTask -TaskName $TaskName
+    $savedTrigger = $saved.Triggers[0]
+    Write-Ok "Task saved: $TaskName"
+    Write-Ok "Day:        $($savedTrigger.DaysOfWeek)"
+    Write-Ok "Time:       $($savedTrigger.StartBoundary)"
+    Write-Ok "Script:     $wslScript"
 } catch {
     Write-Host "  ERROR: $_" -ForegroundColor Red
     Write-Host "  Try running this script as Administrator." -ForegroundColor Yellow
