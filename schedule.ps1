@@ -33,12 +33,12 @@ function Write-Ok  { param($m) Write-Host "  [OK] $m" -ForegroundColor Green }
 function Write-Info{ param($m) Write-Host "  [..] $m" -ForegroundColor Cyan }
 function Write-Warn{ param($m) Write-Host "  [!!] $m" -ForegroundColor Yellow }
 
-Write-Host "`n  Yao Pentest — Task Scheduler`n" -ForegroundColor Cyan
+Write-Host "`n  Yao Pentest - Task Scheduler`n" -ForegroundColor Cyan
 
 if ($Remove) {
     try {
         Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
-        Write-Ok "Task '$TaskName' removed."
+        Write-Ok "Task removed: $TaskName"
     } catch {
         Write-Warn "Task not found or could not be removed: $_"
     }
@@ -49,7 +49,7 @@ if ($Remove) {
 $emailConfig = Join-Path $ScriptDir "email-config.json"
 if (-not (Test-Path $emailConfig)) {
     Write-Warn "email-config.json not found."
-    Write-Host "  Copy email-config.example.json → email-config.json and fill in your SMTP details." -ForegroundColor Yellow
+    Write-Host "  Copy email-config.example.json to email-config.json and fill in your SMTP details." -ForegroundColor Yellow
     $cont = Read-Host "  Continue anyway? (y/N)"
     if ($cont -ne "y") { exit 1 }
 }
@@ -58,7 +58,7 @@ if (-not (Test-Path $emailConfig)) {
 $wslScript = "$WslBase/weekly-scan.sh"
 $wslCmd    = "wsl.exe -d Ubuntu-24.04 -u root -- bash `"$wslScript`""
 
-# Create task action — runs WSL with the weekly scan script
+# Create task action - runs WSL with the weekly scan script
 $action  = New-ScheduledTaskAction `
     -Execute "wsl.exe" `
     -Argument "-d Ubuntu-24.04 -u root -- bash `"$wslScript`""
@@ -69,14 +69,14 @@ $trigger = New-ScheduledTaskTrigger `
     -DaysOfWeek $DayOfWeek `
     -At $Time
 
-# Settings — run whether or not user is logged in, wake if sleeping
+# Settings - run whether or not user is logged in, wake if sleeping
 $settings = New-ScheduledTaskSettingsSet `
     -ExecutionTimeLimit (New-TimeSpan -Hours 6) `
     -RunOnlyIfNetworkAvailable `
     -WakeToRun `
     -StartWhenAvailable
 
-# Principal — run as SYSTEM so it works when no user is logged in
+# Principal - run as SYSTEM so it works when no user is logged in
 $principal = New-ScheduledTaskPrincipal `
     -UserId "SYSTEM" `
     -LogonType ServiceAccount `
