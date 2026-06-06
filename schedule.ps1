@@ -91,8 +91,8 @@ try {
         -Trigger   $trigger `
         -Settings  $settings `
         -Principal $principal `
-        -Description "Weekly Yao security scan — updates tools, scans all targets, emails report"
-    Write-Ok "Task '$TaskName' created."
+        -Description "Weekly Yao security scan - updates tools, scans all targets, emails report"
+    Write-Ok "Task created: $TaskName"
     Write-Ok "Runs every $DayOfWeek at $Time"
     Write-Ok "Script: $wslScript"
 } catch {
